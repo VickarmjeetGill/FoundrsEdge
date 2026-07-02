@@ -27,6 +27,10 @@ type AdminEvent = {
   location: string;
   description: string;
   tags: string[];
+  submissionType: 'Guest' | 'Member';
+  guestName?: string;
+  guestEmail?: string;
+  guestBusiness?: string;
 };
 
 type Tab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -111,8 +115,12 @@ export default function AdminEventsPage() {
             id: e.id,
             title: e.title,
             category: e.category,
-            host: e.host || "Member",
-            hostEmail: "member@foundersedge.com",
+            host: e.guest_name || e.host || "Member",
+            hostEmail: e.guest_email || "Registered Member",
+            submissionType: e.guest_email ? "Guest" : "Member",
+            guestName: e.guest_name,
+            guestEmail: e.guest_email,
+            guestBusiness: e.guest_business,
             date: e.date,
             time: e.time,
             duration: e.duration || "2 Hours",
@@ -365,6 +373,25 @@ export default function AdminEventsPage() {
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
                       <span style={{ fontSize: '13px', color: '#9a9585' }}>
                         <strong style={{ color: '#5a5650' }}>{event.category}</strong> · by {event.host}
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            padding: '2px 8px',
+                            background:
+                              event.submissionType === 'Guest'
+                                ? '#fff3cd'
+                                : '#e8f5e9',
+                            color:
+                              event.submissionType === 'Guest'
+                                ? '#856404'
+                                : '#2e7d32',
+                            borderRadius: 4,
+                            fontSize: '11px',
+                            fontWeight: 700
+                          }}
+                        >
+                          {event.submissionType}
+                        </span>
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>

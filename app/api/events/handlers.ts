@@ -67,16 +67,16 @@ export class CreateEventDto {
   contactEmail?: string;
 
   @IsOptional()
-@IsString()
-guestName?: string;
+  @IsString()
+  guestName?: string;
 
-@IsOptional()
-@IsString()
-guestEmail?: string;
+  @IsOptional()
+  @IsString()
+  guestEmail?: string;
 
-@IsOptional()
-@IsString()
-guestBusiness?: string;
+  @IsOptional()
+  @IsString()
+  guestBusiness?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -236,7 +236,10 @@ export async function getEvents(request: Request) {
           featured: true,
           status: true,
           capacity: true,
-          attendees: true
+          attendees: true,
+          guest_name: true,
+          guest_email: true,
+          guest_business: true,
         }
       })
     ])
@@ -320,6 +323,9 @@ export async function createEvent(request: Request) {
         price: price || "Free",
         host: host || "Member Submission",
         member_id: memberId,
+        guest_name: guestName || null,
+        guest_email: guestEmail || null,
+        guest_business: guestBusiness || null,
         status: isAdmin ? "APPROVED" : "PENDING",
         capacity: capacity ? Number(capacity) : 50,
         featured: typeof featured === "boolean" ? featured : false,
