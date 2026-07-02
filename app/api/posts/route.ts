@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const content = body.content;
     const authorName = body.authorName || 'Member';
     const authorBusiness = body.authorBusiness || null;
+    const authorEmail = body.authorEmail?.toLowerCase()?.trim() || null;
 
     if (!content) {
       return NextResponse.json(
@@ -35,6 +36,23 @@ export async function POST(request: NextRequest) {
         linked_url: body.linkedUrl || null,
       },
     });
+
+    if (authorEmail) {
+      await (prisma as any).post_email_usage.upsert({
+        where: {
+          email: authorEmail,
+        },
+        update: {
+          post_count: {
+            increment: 1,
+          },
+        },
+        create: {
+          email: authorEmail,
+          post_count: 1,
+        },
+      });
+    }
 
     await invalidateCache();
 
