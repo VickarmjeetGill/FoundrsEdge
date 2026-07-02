@@ -302,13 +302,62 @@ export async function createEvent(request: Request) {
       return NextResponse.json({ success: false, error: "Validation failed", details: errors }, { status: 400 });
     }
     const body = data;
-    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, guestName, guestEmail, guestBusiness } = body;
+    const {
+      title,
+      description,
+      date,
+      time,
+      location,
+      category,
+      price,
+      host,
+      tags,
+      capacity,
+      featured,
+      duration,
+      guestName,
+      guestEmail,
+      guestBusiness
+    } = body;
+
+    const normalizedGuestEmail = guestEmail?.toLowerCase()?.trim() || null;
     // Validation: Make sure they filled out all the required fields
     if (!body.title || !body.description || !body.date || !body.time || !body.location || !body.category) {
       return NextResponse.json(
         { error: "Missing required fields: title, description, date, time, location, category" },
         { status: 400 }
       )
+    }
+
+    if (!memberId && !normalizedGuestEmail) {
+      return NextResponse.json(
+        { success: false, error: "Guest email is required for guest event submissions." },
+        { status: 400 }
+      );
+    }
+
+    if (!memberId && normalizedGuestEmail) {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const recentGuestSubmission = await prisma.events.findFirst({
+        where: {
+          guest_email: normalizedGuestEmail,
+          created_at: {
+            gte: thirtyDaysAgo,
+          },
+        },
+      });
+
+      if (recentGuestSubmission) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "This email has already used its free event submission in the last 30 days.",
+          },
+          { status: 429 }
+        );
+      }
     }
 
     // Save the new event in the database (sets status to APPROVED for admin, PENDING for others)
@@ -324,7 +373,7 @@ export async function createEvent(request: Request) {
         host: host || "Member Submission",
         member_id: memberId,
         guest_name: guestName || null,
-        guest_email: guestEmail || null,
+        guest_email: normalizedGuestEmail,
         guest_business: guestBusiness || null,
         status: isAdmin ? "APPROVED" : "PENDING",
         capacity: capacity ? Number(capacity) : 50,
@@ -745,3 +794,5 @@ export async function rsvpEvent(
     )
   }
 }
+
+
