@@ -110,6 +110,7 @@ model events {
   featured       Boolean     @default(false)
   status         EventStatus @default(PENDING)
   member_id      String?     @db.Uuid
+  source         String      @default("member")
   guest_name     String?     @map("guestName")
   guest_email    String?     @map("guestEmail")
   guest_business String?     @map("guestBusiness")
