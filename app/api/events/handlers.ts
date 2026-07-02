@@ -67,6 +67,18 @@ export class CreateEventDto {
   contactEmail?: string;
 
   @IsOptional()
+@IsString()
+guestName?: string;
+
+@IsOptional()
+@IsString()
+guestEmail?: string;
+
+@IsOptional()
+@IsString()
+guestBusiness?: string;
+
+  @IsOptional()
   @IsBoolean()
   isOnline?: boolean;
 
@@ -287,8 +299,7 @@ export async function createEvent(request: Request) {
       return NextResponse.json({ success: false, error: "Validation failed", details: errors }, { status: 400 });
     }
     const body = data;
-    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration } = body;
-
+    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, guestName, guestEmail, guestBusiness } = body;
     // Validation: Make sure they filled out all the required fields
     if (!body.title || !body.description || !body.date || !body.time || !body.location || !body.category) {
       return NextResponse.json(
