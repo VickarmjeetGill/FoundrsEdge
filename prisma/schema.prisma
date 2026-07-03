@@ -25,7 +25,7 @@ model businesses {
   members                     members?  @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   offers                      offers[]
 
-//indexing the member_id foreign key
+  //indexing the member_id foreign key
   @@index([member_id])
   @@index([business_name])
 }
@@ -56,8 +56,9 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   role         String   @default("MEMBER")
-  avatarUrl    String?
   status       String   @default("ACTIVE")
+
+  avatarUrl String?
 
   @@index([role])
   @@index([status])
@@ -93,33 +94,32 @@ model offers {
   @@index([type])
   @@index([status, expiry_date])
   @@index([created_at])
-
 }
 
 model events {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String
-  description String
-  date        String
-  time        String
-  location    String
-  category    String
-  price       String
-  host        String
-  attendees   Int         @default(0)
-  featured    Boolean     @default(false)
-  status      EventStatus @default(PENDING)
-  member_id   String?     @db.Uuid
-  created_at  DateTime?   @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime?   @db.Timestamptz(6)
-  tags        String[]    @default([])
-  capacity    Int         @default(50)
-  duration    String      @default("2 hrs")
-  members     members?    @relation(fields: [member_id], references: [id], onDelete: Cascade)
-
-  guestName String?
-  guestEmail String?
-  guestBusiness String?
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title          String
+  description    String
+  date           String
+  time           String
+  location       String
+  category       String
+  price          String
+  host           String
+  attendees      Int         @default(0)
+  featured       Boolean     @default(false)
+  status         EventStatus @default(PENDING)
+  member_id      String?     @db.Uuid
+  source         String      @default("member")
+  guest_name     String?     @map("guestName")
+  guest_email    String?     @map("guestEmail")
+  guest_business String?     @map("guestBusiness")
+  created_at     DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?   @db.Timestamptz(6)
+  tags           String[]    @default([])
+  capacity       Int         @default(50)
+  duration       String      @default("2 hrs")
+  members        members?    @relation(fields: [member_id], references: [id], onDelete: Cascade)
 
   @@index([member_id])
   @@index([status])
@@ -181,7 +181,6 @@ model nominations {
   @@index([member_id])
   @@index([status])
   @@index([created_at])
-
 }
 
 model posts {
@@ -271,4 +270,14 @@ model likes {
   created_at      DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([target_type, target_id, user_identifier])
+}
+
+model post_email_usage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String   @unique
+  post_count Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([email])
 }

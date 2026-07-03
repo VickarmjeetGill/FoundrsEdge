@@ -5,6 +5,10 @@ import { decrypt } from "@/lib/tokens"
 import { invalidateCache } from "@/lib/redis"
 import { rateLimit } from "@/lib/rate-limiter"
 import { validateBody } from "@/lib/validate"
+import {
+  sendGuestEventApprovalEmail,
+  sendGuestEventRejectionEmail,
+} from "@/lib/email"
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateEventDto {
@@ -67,14 +71,6 @@ export class CreateEventDto {
   contactEmail?: string;
 
   @IsOptional()
-  @IsBoolean()
-  isOnline?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  agreeGuidelines?: boolean;
-
-  @IsOptional()
   @IsString()
   guestName?: string;
 
@@ -85,6 +81,14 @@ export class CreateEventDto {
   @IsOptional()
   @IsString()
   guestBusiness?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isOnline?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  agreeGuidelines?: boolean;
 }
 
 // Helper function to check if a string is a valid UUID
@@ -234,15 +238,16 @@ export async function getEvents(request: Request) {
           price: true,
           host: true,
           featured: true,
+          source: true,
           status: true,
           capacity: true,
           attendees: true,
           created_at: true,
           duration: true,
           tags: true,
-          guestName: true,
-          guestEmail: true,
-          guestBusiness: true,
+          guest_name: true,
+          guest_email: true,
+          guest_business: true,
           members: {
             select: {
               email: true
@@ -320,7 +325,7 @@ export async function createEvent(request: Request) {
     if (!memberId && guestEmail) {
       const existingEvent = await prisma.events.findFirst({
         where: {
-          guestEmail: {
+          guest_email: {
             equals: guestEmail,
             mode: 'insensitive'
           }
@@ -335,6 +340,8 @@ export async function createEvent(request: Request) {
       }
     }
 
+    const normalizedGuestEmail = guestEmail ? guestEmail.toLowerCase().trim() : null;
+
     // Save the new event in the database (sets status to APPROVED for admin, PENDING for others)
     const newEvent = await prisma.events.create({
       data: {
@@ -347,6 +354,7 @@ export async function createEvent(request: Request) {
         price: price || "Free",
         host: host || "Public Submission",
         member_id: memberId,
+        source: memberId ? "member" : "public",
         status: isAdmin ? "APPROVED" : "PENDING",
         capacity: capacity ? Number(capacity) : 50,
         featured: typeof featured === "boolean" ? featured : false,
@@ -356,9 +364,9 @@ export async function createEvent(request: Request) {
           : typeof tags === "string"
             ? tags.split(",").map((t: string) => t.trim()).filter(Boolean)
             : [],
-        guestName: memberId ? undefined : guestName,
-        guestEmail: memberId ? undefined : guestEmail,
-        guestBusiness: memberId ? undefined : guestBusiness,
+        guest_name: memberId ? undefined : guestName,
+        guest_email: memberId ? undefined : normalizedGuestEmail,
+        guest_business: memberId ? undefined : guestBusiness,
       }
     })
 
@@ -636,6 +644,34 @@ export async function updateEventStatus(
       }
     })
 
+    console.log("Approval email debug:", {
+      status,
+      source: (updatedEvent as any).source,
+      guest_email: (updatedEvent as any).guest_email,
+      title: updatedEvent.title,
+    });
+
+    if (
+      (updatedEvent as any).source === "public" &&
+      (updatedEvent as any).guest_email
+    ) {
+      if (status === "APPROVED") {
+        await sendGuestEventApprovalEmail({
+          to: (updatedEvent as any).guest_email,
+          guestName: (updatedEvent as any).guest_name,
+          eventTitle: updatedEvent.title,
+        });
+      }
+
+      if (status === "REJECTED") {
+        await sendGuestEventRejectionEmail({
+          to: (updatedEvent as any).guest_email,
+          guestName: (updatedEvent as any).guest_name,
+          eventTitle: updatedEvent.title,
+        });
+      }
+    }
+
     await invalidateCache();
 
     return NextResponse.json({
@@ -769,3 +805,5 @@ export async function rsvpEvent(
     )
   }
 }
+
+
