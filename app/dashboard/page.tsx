@@ -6,7 +6,7 @@ import {
   Settings, Calendar, Building2, Users, BookOpen, Trophy, Star,
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
-  UserCircle, Globe, MapPin, Rss,
+  UserCircle, Globe, MapPin, Rss, Menu, X as CloseIcon,
 } from 'lucide-react';
 import FeedSection from './FeedSection';
 import NotificationBell from './NotificationBell';
@@ -577,6 +577,16 @@ export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState<Section>('feed');
   const [member, setMember] = useState(defaultMember);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Track viewport so the fixed sidebar can go off-canvas on small screens.
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 900);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const isAdmin = userProfile?.role === 'ADMIN';
   const visibleNavItems = isAdmin
     ? [
@@ -894,7 +904,7 @@ export default function DashboardPage() {
     if (item.section) {
       return (
         <button
-          onClick={() => setActiveSection(item.section!)}
+          onClick={() => { setActiveSection(item.section!); setSidebarOpen(false); }}
           style={{ ...sharedStyle, background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
         >
           <item.icon size={16} />
@@ -1389,12 +1399,22 @@ export default function DashboardPage() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
 
+      {/* Mobile overlay */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55 }} />
+      )}
+
       {/* Sidebar */}
-      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50 }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a' }}>
+      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60, transform: (!isMobile || sidebarOpen) ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <Logo size="sm" />
           </Link>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, display: 'flex' }}>
+              <CloseIcon size={20} />
+            </button>
+          )}
         </div>
 
         {/* Member card */}
@@ -1448,14 +1468,21 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main style={{ marginLeft: 260, flex: 1 }}>
+      <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, minWidth: 0 }}>
         {/* Top bar */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40 }}>
-          <div>
-            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px' }}>
-              {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
-            </h1>
-            <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
+        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {isMobile && (
+              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
+                <Menu size={20} />
+              </button>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: isMobile ? '17px' : '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
+              </h1>
+              <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <NotificationBell />

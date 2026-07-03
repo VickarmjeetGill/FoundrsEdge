@@ -38,6 +38,14 @@ const placeholderTags = ['funding', 'hiring', 'yyc', 'saas', 'partnerships'];
 export default function FeedSection({ memberName, memberBusiness, basics }: Props) {
   const [posts, setPosts]   = useState<Post[]>([]);
   const [filter, setFilter] = useState<FeedFilter>('all');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 900);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Recompute when member basics change (name/industry/stage/avatar load in async)
   const completion = useMemo(
@@ -84,8 +92,8 @@ export default function FeedSection({ memberName, memberBusiness, basics }: Prop
   const railCard: React.CSSProperties = { background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: '16px' };
 
   return (
-    <div style={{ padding: '32px 40px' }}>
-     <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+    <div style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
+     <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
 
       {/* ── Center column ─────────────────────────────── */}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -154,7 +162,7 @@ export default function FeedSection({ memberName, memberBusiness, basics }: Prop
       </div>
 
       {/* ── Right rail ────────────────────────────────── */}
-      <aside style={{ width: 280, flexShrink: 0, position: 'sticky', top: 88, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <aside style={{ width: isMobile ? '100%' : 280, flexShrink: 0, position: isMobile ? 'static' : 'sticky', top: 88, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Profile card */}
         <div style={railCard}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
