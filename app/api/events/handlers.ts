@@ -5,6 +5,7 @@ import { decrypt } from "@/lib/tokens"
 import { invalidateCache } from "@/lib/redis"
 import { rateLimit } from "@/lib/rate-limiter"
 import { validateBody } from "@/lib/validate"
+import { sendGuestEventApprovalEmail } from "@/lib/email"
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateEventDto {
@@ -662,6 +663,25 @@ export async function updateEventStatus(
         status: status as "APPROVED" | "REJECTED"
       }
     })
+
+    console.log("Approval email debug:", {
+      status,
+      source: (updatedEvent as any).source,
+      guest_email: (updatedEvent as any).guest_email,
+      title: updatedEvent.title,
+    });
+
+    if (
+      status === "APPROVED" &&
+      (updatedEvent as any).source === "public" &&
+      (updatedEvent as any).guest_email
+    ) {
+      await sendGuestEventApprovalEmail({
+        to: (updatedEvent as any).guest_email,
+        guestName: (updatedEvent as any).guest_name,
+        eventTitle: updatedEvent.title,
+      });
+    }
 
     await invalidateCache();
 
