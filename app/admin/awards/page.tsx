@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Activity } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -176,11 +176,12 @@ export default function AdminAwardsPage() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0 }}>
           {[
             { href: '/admin/dashboard', icon: <LayoutDashboard size={14} />, label: 'Content Manager', active: false },
-            { href: '/admin/events', icon: <ClipboardList size={14} />, label: 'Review Events', active: false },
-            { href: '/admin/offers', icon: <Tag size={14} />, label: 'Review Offers', active: false },
-            { href: '/admin/awards', icon: <Trophy size={14} />, label: 'Review Awards', active: true },
-            { href: '/admin/flagged', icon: <Flag size={14} />, label: 'Flagged Content', active: false },
-            { href: '/admin/users', icon: <Users size={14} />, label: 'Users', active: false },
+            { href: '/admin/events',    icon: <ClipboardList size={14} />,   label: 'Review Events',   active: false },
+            { href: '/admin/offers',    icon: <Tag size={14} />,             label: 'Review Offers',   active: false },
+            { href: '/admin/awards',    icon: <Trophy size={14} />,          label: 'Review Awards',   active: true },
+            { href: '/admin/flagged',   icon: <Flag size={14} />,            label: 'Flagged Content', active: false },
+            { href: '/admin/users',     icon: <Users size={14} />,           label: 'Users',           active: false },
+            { href: '/admin/activity',  icon: <Activity size={14} />,        label: 'Activity Log',    active: false },
           ].map(item => (
             <Link
               key={item.href}

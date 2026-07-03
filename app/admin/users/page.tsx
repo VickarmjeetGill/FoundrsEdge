@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Users, LayoutDashboard, ClipboardList, Tag, Trophy, Flag,
-  LogOut, Search, UserCheck, UserX, Repeat, ShieldCheck, X,
+  LogOut, Search, UserCheck, UserX, Repeat, ShieldCheck, X, Activity,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
@@ -329,6 +329,11 @@ export default function AdminUsersPage() {
           </Link>
           <Link href="/admin/users" style={{ ...navLinkBase, color: '#e7b605', borderBottom: '2px solid #e7b605' }}>
             <Users size={14} /> Users
+          </Link>
+          <Link href="/admin/activity" style={navLinkBase}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
+            <Activity size={14} /> Activity Log
           </Link>
         </div>
       </div>
