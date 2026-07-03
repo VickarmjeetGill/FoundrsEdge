@@ -17,3 +17,23 @@ export async function sendGuestEventApprovalEmail({
 
   return { success: true };
 }
+
+type GuestEventRejectionEmailParams = {
+  to: string;
+  guestName?: string | null;
+  eventTitle: string;
+};
+
+export async function sendGuestEventRejectionEmail({
+  to,
+  guestName,
+  eventTitle,
+}: GuestEventRejectionEmailParams) {
+  console.log("Guest event rejection email queued:", {
+    to,
+    subject: `Update on your event "${eventTitle}"`,
+    message: `Hi ${guestName || "there"}, thank you for submitting "${eventTitle}" to Founders Edge. Unfortunately, it was not approved for publishing at this time.`,
+  });
+
+  return { success: true };
+}
