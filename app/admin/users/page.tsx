@@ -388,9 +388,9 @@ export default function AdminUsersPage() {
               <div style={{ fontFamily: 'Noto Serif, serif', color: '#b8b4ae', fontSize: '14px' }}>Try a different tab or search term.</div>
             </div>
           ) : (
-            <div>
+            <div style={{ overflowX: 'auto' }}>
               {/* Header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 110px 260px', gap: 0, padding: '12px 24px', background: '#f9f9f7', borderBottom: '1px solid #e2e0d8' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 110px 260px', gap: 0, padding: '12px 24px', background: '#f9f9f7', borderBottom: '1px solid #e2e0d8', minWidth: 720 }}>
                 {['User', 'Role', 'Status', 'Joined', 'Actions'].map(h => (
                   <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{h}</div>
                 ))}
@@ -400,7 +400,7 @@ export default function AdminUsersPage() {
                 const rs = roleStyles[u.role];
                 const suspended = u.status === 'suspended';
                 return (
-                  <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 110px 260px', gap: 0, padding: '14px 24px', borderBottom: '1px solid #f0efe9', alignItems: 'center', opacity: suspended ? 0.7 : 1 }}>
+                  <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 110px 260px', gap: 0, padding: '14px 24px', borderBottom: '1px solid #f0efe9', alignItems: 'center', opacity: suspended ? 0.7 : 1, minWidth: 720 }}>
                     {/* User */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingRight: 16, minWidth: 0 }}>
                       <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#000', color: '#e7b605', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '15px', flexShrink: 0 }}>
