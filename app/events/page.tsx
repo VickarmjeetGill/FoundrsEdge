@@ -1,8 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, Clock, Search, Users, ExternalLink, ChevronRight, Wifi, Star } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
+import { SkeletonCard } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 type Event = {
   id: number;
@@ -67,6 +69,8 @@ export default function EventsPage() {
   const [locationFilter, setLocationFilter] = useState('All Locations');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [dbEvents, setDbEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -81,34 +85,37 @@ export default function EventsPage() {
     setCurrentPage(1);
   }, [category, dateFilter, locationFilter, featuredOnly]);
 
-  useEffect(() => {
-    async function loadEvents() {
-      try {
-        const queryParams = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: itemsPerPage.toString(),
-        });
+  const loadEvents = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      });
 
-        if (category !== 'All') queryParams.append('category', category);
-        if (locationFilter !== 'All Locations') queryParams.append('locationType', locationFilter);
-        if (featuredOnly) queryParams.append('featured', 'true');
-        if (search) queryParams.append('q', search);
+      if (category !== 'All') queryParams.append('category', category);
+      if (locationFilter !== 'All Locations') queryParams.append('locationType', locationFilter);
+      if (featuredOnly) queryParams.append('featured', 'true');
+      if (search) queryParams.append('q', search);
 
-        const res = await fetch(`/api/events?${queryParams.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setDbEvents(data.events || []);
-          if (data.pagination) {
-            setTotalPages(data.pagination.totalPages);
-            setTotalResults(data.pagination.total);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load DB events:', err);
+      const res = await fetch(`/api/events?${queryParams.toString()}`);
+      if (!res.ok) { setLoadError(true); return; }
+      const data = await res.json();
+      setDbEvents(data.events || []);
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages);
+        setTotalResults(data.pagination.total);
       }
+    } catch (err) {
+      console.error('Failed to load DB events:', err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    loadEvents();
-  }, [currentPage, category, locationFilter, featuredOnly, search, dateFilter]);
+  }, [currentPage, category, locationFilter, featuredOnly, search]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   const mappedDbEvents: Event[] = dbEvents.map((e: any) => ({
     id: e.id,
@@ -288,7 +295,15 @@ export default function EventsPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {filtered.length === 0 && (
+            {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+
+            {!loading && loadError && (
+              <div style={{ background: '#fff', border: '1px solid #e2e0d8' }}>
+                <ErrorState kind="network" onRetry={loadEvents} />
+              </div>
+            )}
+
+            {!loading && !loadError && filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px 40px', background: '#fff', border: '1px solid #e2e0d8' }}>
                 <div style={{ fontSize: '40px', marginBottom: 16 }}>🔍</div>
                 <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '18px', marginBottom: 8 }}>No events found</div>
@@ -296,7 +311,7 @@ export default function EventsPage() {
               </div>
             )}
 
-            {filtered.map(event => {
+            {!loading && !loadError && filtered.map(event => {
               const spotsLeft = event.capacity - event.attendees;
               const fillPct = Math.round((event.attendees / event.capacity) * 100);
               return (

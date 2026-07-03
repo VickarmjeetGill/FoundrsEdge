@@ -116,7 +116,7 @@ export default function PostCard({ post, currentUserName, currentUserBusiness, o
         {post.imageUrl && (
           <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e0d8', marginBottom: (post.externalUrl || post.linkedType) ? 14 : 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.imageUrl} alt="Post attachment" style={{ width: '100%', maxHeight: 460, objectFit: 'cover', display: 'block' }} />
+            <img src={post.imageUrl} alt="Post attachment" loading="lazy" decoding="async" style={{ width: '100%', maxHeight: 460, objectFit: 'cover', display: 'block' }} />
           </div>
         )}
 
