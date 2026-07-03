@@ -73,6 +73,18 @@ export class CreateEventDto {
   @IsOptional()
   @IsBoolean()
   agreeGuidelines?: boolean;
+
+  @IsOptional()
+  @IsString()
+  guestName?: string;
+
+  @IsOptional()
+  @IsString()
+  guestEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  guestBusiness?: string;
 }
 
 // Helper function to check if a string is a valid UUID
@@ -224,7 +236,18 @@ export async function getEvents(request: Request) {
           featured: true,
           status: true,
           capacity: true,
-          attendees: true
+          attendees: true,
+          created_at: true,
+          duration: true,
+          tags: true,
+          guestName: true,
+          guestEmail: true,
+          guestBusiness: true,
+          members: {
+            select: {
+              email: true
+            }
+          }
         }
       })
     ])
@@ -246,7 +269,7 @@ export async function getEvents(request: Request) {
 export async function createEvent(request: Request) {
   try {
     const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-    const { success } = await rateLimit(ip, 10, 60);
+    const { success } = await rateLimit(ip, 5, 60);
     if (!success) {
       return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
     }
@@ -255,8 +278,8 @@ export async function createEvent(request: Request) {
     const sessionToken = cookieStore.get("session")?.value
 
     let memberId: string | null = null
-
     let isAdmin = false
+
 
     // Find the logged-in member to associate this event submission with them
     if (sessionToken) {
@@ -266,13 +289,9 @@ export async function createEvent(request: Request) {
           isAdmin = true
         }
         if (decoded?.userId) {
-          const user = await prisma.user.findUnique({
-            where: { id: decoded.userId }
-          })
+          const user = await prisma.user.findUnique({ where: { id: decoded.userId } })
           if (user?.email) {
-            const member = await prisma.members.findUnique({
-              where: { email: user.email }
-            })
+            const member = await prisma.members.findUnique({ where: { email: user.email } })
             memberId = member?.id || null
           }
         }
@@ -287,7 +306,7 @@ export async function createEvent(request: Request) {
       return NextResponse.json({ success: false, error: "Validation failed", details: errors }, { status: 400 });
     }
     const body = data;
-    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration } = body;
+    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, guestName, guestEmail, guestBusiness } = body;
 
     // Validation: Make sure they filled out all the required fields
     if (!body.title || !body.description || !body.date || !body.time || !body.location || !body.category) {
@@ -295,6 +314,25 @@ export async function createEvent(request: Request) {
         { error: "Missing required fields: title, description, date, time, location, category" },
         { status: 400 }
       )
+    }
+
+    // Limit check: Check if a guest submission with this email already exists in the database
+    if (!memberId && guestEmail) {
+      const existingEvent = await prisma.events.findFirst({
+        where: {
+          guestEmail: {
+            equals: guestEmail,
+            mode: 'insensitive'
+          }
+        }
+      });
+
+      if (existingEvent) {
+        return NextResponse.json(
+          { error: "You have already submitted a free event listing. Additional listings require a Founders Edge membership." },
+          { status: 400 }
+        );
+      }
     }
 
     // Save the new event in the database (sets status to APPROVED for admin, PENDING for others)
@@ -307,7 +345,7 @@ export async function createEvent(request: Request) {
         location,
         category,
         price: price || "Free",
-        host: host || "Member Submission",
+        host: host || "Public Submission",
         member_id: memberId,
         status: isAdmin ? "APPROVED" : "PENDING",
         capacity: capacity ? Number(capacity) : 50,
@@ -318,6 +356,9 @@ export async function createEvent(request: Request) {
           : typeof tags === "string"
             ? tags.split(",").map((t: string) => t.trim()).filter(Boolean)
             : [],
+        guestName: memberId ? undefined : guestName,
+        guestEmail: memberId ? undefined : guestEmail,
+        guestBusiness: memberId ? undefined : guestBusiness,
       }
     })
 

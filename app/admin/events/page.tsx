@@ -27,6 +27,9 @@ type AdminEvent = {
   location: string;
   description: string;
   tags: string[];
+  guestName?: string;
+  guestEmail?: string;
+  guestBusiness?: string;
 };
 
 type Tab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -111,8 +114,8 @@ export default function AdminEventsPage() {
             id: e.id,
             title: e.title,
             category: e.category,
-            host: e.host || "Member",
-            hostEmail: "member@foundersedge.com",
+            host: e.host || e.guestName || "Public Submission",
+            hostEmail: e.guestEmail || e.members?.email || "member@foundersedge.com",
             date: e.date,
             time: e.time,
             duration: e.duration || "2 Hours",
@@ -129,7 +132,10 @@ export default function AdminEventsPage() {
             ) : false,
             location: e.location,
             description: e.description,
-            tags: e.tags && e.tags.length > 0 ? e.tags : [e.category]
+            tags: e.tags && e.tags.length > 0 ? e.tags : [e.category],
+            guestName: e.guestName || undefined,
+            guestEmail: e.guestEmail || undefined,
+            guestBusiness: e.guestBusiness || undefined
           }));
           setEvents(mapped);
           persistApproved(mapped);
@@ -361,6 +367,15 @@ export default function AdminEventsPage() {
                           <Star size={9} fill="#9b7011" /> Featured
                         </span>
                       )}
+                      {event.guestName || event.guestEmail ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: '#eae8e1', color: '#5a5650', padding: '2px 8px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 2 }}>
+                          Guest Submission
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(231,182,5,0.08)', color: '#9b7011', padding: '2px 8px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 2 }}>
+                          Member Submission
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 4 }}>
                       <span style={{ fontSize: '13px', color: '#9a9585' }}>
@@ -409,6 +424,17 @@ export default function AdminEventsPage() {
                 {/* Expanded detail panel */}
                 {isExpanded && (
                   <div style={{ background: '#fafaf8', borderTop: '1px solid #e2e0d8', padding: '28px 32px 28px 52px' }}>
+                    {/* Guest details if applicable */}
+                    {(event.guestName || event.guestBusiness) && (
+                      <div style={{ marginBottom: 24, padding: '16px', background: '#f0efe9', borderLeft: '3px solid #e7b605' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#5a5650', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Guest Submitter Details</div>
+                        <div style={{ fontSize: '13px', color: '#2a2820' }}>
+                          <strong>Name:</strong> {event.guestName || 'N/A'}
+                          {event.guestBusiness && <> · <strong>Company:</strong> {event.guestBusiness}</>}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Description */}
                     <div style={{ marginBottom: 24 }}>
                       <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Description</div>

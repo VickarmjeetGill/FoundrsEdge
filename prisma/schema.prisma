@@ -117,6 +117,10 @@ model events {
   duration    String      @default("2 hrs")
   members     members?    @relation(fields: [member_id], references: [id], onDelete: Cascade)
 
+  guestName String?
+  guestEmail String?
+  guestBusiness String?
+
   @@index([member_id])
   @@index([status])
   @@index([category])

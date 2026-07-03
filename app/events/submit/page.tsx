@@ -21,6 +21,9 @@ type FormData = {
   contactEmail: string;
   tags: string;
   agreeGuidelines: boolean;
+  guestName: string;
+  guestEmail: string;
+  guestBusiness: string;
 };
 
 type FormErrors = Partial<Record<keyof FormData, string>>;
@@ -40,12 +43,17 @@ const initialForm: FormData = {
   contactEmail: '',
   tags: '',
   agreeGuidelines: false,
+  guestName: '',
+  guestEmail: '',
+  guestBusiness: '',
 };
 
 const categories = ['Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'];
 
-function validateForm(form: FormData): FormErrors {
+function validateForm(form: FormData, isLoggedIn: boolean): FormErrors {
   const errors: FormErrors = {};
+
+  // 1. Core fields required for everyone
   if (!form.title.trim()) errors.title = 'Please enter a valid title.';
   if (!form.date) errors.date = 'Please enter a valid date.';
   if (!form.time) errors.time = 'Please enter a valid time.';
@@ -54,14 +62,18 @@ function validateForm(form: FormData): FormErrors {
     errors.duration = 'Please enter a valid duration.';
   }
 
-  if (!form.capacity.trim() || isNaN(Number(form.capacity)) || Number(form.capacity) <= 0)
+  if (!form.capacity.trim() || isNaN(Number(form.capacity)) || Number(form.capacity) <= 0) {
     errors.capacity = 'Please enter a valid capacity.';
-  if (!form.isOnline && !form.location.trim()) errors.location = 'Please enter a valid location.';
-  if (!form.description.trim() || form.description.trim().length < 30)
+  }
+
+  if (!form.isOnline && !form.location.trim()) {
+    errors.location = 'Please enter a valid location.';
+  }
+
+  if (!form.description.trim() || form.description.trim().length < 30) {
     errors.description = 'Please enter a valid description (minimum 30 characters).';
-  if (!form.hostName.trim()) errors.hostName = 'Please enter a valid host name.';
-  if (!form.contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail))
-    errors.contactEmail = 'Please enter a valid contact email.';
+  }
+
   if (form.price.trim()) {
     const trimmedPrice = form.price.trim();
     const isKnownText = ['free', 'members only', 'members-only', 'invite only', 'invite-only', 'tbd'].includes(trimmedPrice.toLowerCase());
@@ -70,7 +82,31 @@ function validateForm(form: FormData): FormErrors {
       errors.price = 'Please enter "Free", "Members Only", or a valid dollar amount (e.g. "$45" or "45").';
     }
   }
-  if (!form.agreeGuidelines) errors.agreeGuidelines = 'You must agree to the event guidelines.';
+
+  // 2. Fork in the road: Validate identity fields based on auth state
+  if (!isLoggedIn) {
+    // Requirements for public guest submissions
+    if (!form.guestName.trim()) {
+      errors.guestName = 'Your name is required for public submissions.';
+    }
+    if (!form.guestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.guestEmail)) {
+      errors.guestEmail = 'A valid email is required to receive status updates.';
+    }
+  } else {
+    // Requirements for logged-in member submissions
+    if (!form.hostName.trim()) {
+      errors.hostName = 'Please enter a valid host name.';
+    }
+    if (!form.contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail)) {
+      errors.contactEmail = 'Please enter a valid contact email.';
+    }
+  }
+
+  // 3. Final global check
+  if (!form.agreeGuidelines) {
+    errors.agreeGuidelines = 'You must agree to the event guidelines.';
+  }
+
   return errors;
 }
 
@@ -90,29 +126,30 @@ function EventSubmitContent() {
   // Verify that the user is logged in
   useEffect(() => {
     async function checkAuth() {
-      const res = await getProfile();
-      if (!res.success || !res.user) {
-        router.push('/login?redirect=/events/submit');
-        return;
+      try {
+        const res = await getProfile();
+
+        if (res.success && res.user) {
+          const loggedInUser = res.user as any;
+          setUserEmail(loggedInUser.email || '');
+          setUserName(loggedInUser.name || '');
+
+          if (!editId) {
+            setForm(prev => ({
+              ...prev,
+              hostName: prev.hostName || loggedInUser.name || '',
+              contactEmail: prev.contactEmail || loggedInUser.email || '',
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Optional auth check failed:", err);
+      } finally {
+        setAuthChecked(true);
       }
-
-      const loggedInUser = res.user as any;
-      setUserEmail(loggedInUser.email || '');
-      setUserName(loggedInUser.name || '');
-
-      // Auto-pre-fill user name and contact email for new submissions
-      if (!editId) {
-        setForm(prev => ({
-          ...prev,
-          hostName: prev.hostName || loggedInUser.name || '',
-          contactEmail: prev.contactEmail || loggedInUser.email || '',
-        }));
-      }
-
-      setAuthChecked(true);
     }
     checkAuth();
-  }, [router, editId]);
+  }, [editId]);
 
   // Pre-fill form when editing an existing submission
   useEffect(() => {
@@ -142,6 +179,9 @@ function EventSubmitContent() {
             contactEmail: userEmail || 'member@foundersedge.com',
             tags: Array.isArray(dbEvent.tags) ? dbEvent.tags.join(', ') : dbEvent.category || '',
             agreeGuidelines: true,
+            guestName: dbEvent.guestName || '',
+            guestEmail: dbEvent.guestEmail || '',
+            guestBusiness: dbEvent.guestBusiness || '',
           });
           setIsEditing(true);
         } else {
@@ -201,7 +241,14 @@ function EventSubmitContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorMsg('');
-    const errs = validateForm(form);
+
+    // Guest Device-Level Submission Limit check
+    if (!userEmail && localStorage.getItem('fe_has_submitted_free_event') === 'true') {
+      setErrorMsg("You have already submitted a free event listing from this browser. Additional listings require a Founders Edge membership.");
+      return;
+    }
+
+    const errs = validateForm(form, !!userEmail);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       const firstErrKey = Object.keys(errs)[0];
@@ -213,7 +260,9 @@ function EventSubmitContent() {
     // Format the price string dynamically (auto-format numeric amounts like "45" to "$45")
     let finalPrice = form.price.trim();
     if (finalPrice) {
-      if (/^\d+(?:\.\d{2})?$/.test(finalPrice)) {
+      if (finalPrice.toLowerCase() === 'free') {
+        finalPrice = 'Free';
+      } else if (/^\d+(?:\.\d{2})?$/.test(finalPrice)) {
         finalPrice = `$${finalPrice}`;
       }
     } else {
@@ -272,10 +321,13 @@ function EventSubmitContent() {
           location: form.location,
           category: form.category,
           price: finalPrice,
-          host: form.hostName,
+          host: form.hostName || form.guestName || "Public Submission",
           tags: form.tags,
           capacity: form.capacity,
           duration: formattedDuration,
+          guestName: userEmail ? undefined : form.guestName,
+          guestEmail: userEmail ? undefined : form.guestEmail,
+          guestBusiness: userEmail ? undefined : form.guestBusiness,
         }),
       });
 
@@ -286,6 +338,9 @@ function EventSubmitContent() {
       }
 
       saveToLocalStorage(updatedForm);
+      if (!userEmail) {
+        localStorage.setItem('fe_has_submitted_free_event', 'true');
+      }
       setSubmitted(true);
     } catch (err: any) {
       console.error(err);
@@ -330,20 +385,33 @@ function EventSubmitContent() {
               </h2>
               <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', lineHeight: 1.8, fontSize: '16px', marginBottom: 32 }}>
                 {isEditing
-                  ? <>Your updates to <strong>{form.title}</strong> have been saved and sent back for review. Our team will assess the changes within 2–3 business days.</>
-                  : <>Thank you for submitting <strong>{form.title}</strong>. Our team reviews all submitted events within 2–3 business days. If approved, your event will be promoted to all Founders Edge members and featured on the events page.</>
+                  ? <>Your updates to <strong>{form.title}</strong> have been saved and sent back for review. Our team will assess the changes within 48 hours.</>
+                  : <>Thank you for submitting <strong>{form.title}</strong>. Our team reviews all submitted events within 48 hours. If approved, your event will be promoted to all Founders Edge members and featured on the events page.</>
                 }
               </p>
               <p style={{ fontFamily: 'Noto Serif, serif', color: '#9a9585', fontSize: '14px', marginBottom: 40 }}>
-                You'll receive a confirmation email at <strong>{form.contactEmail}</strong> once a decision has been made.
+                You'll receive a confirmation email at <strong>{userEmail ? form.contactEmail : form.guestEmail}</strong> once a decision has been made.
               </p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Link href="/dashboard" className="btn-primary" style={{ justifyContent: 'center' }}>
-                  Back to Dashboard
-                </Link>
-                <Link href="/events" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', border: '1px solid #e2e0d8', color: '#5a5650', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', textDecoration: 'none' }}>
-                  <ArrowLeft size={16} /> All Events
-                </Link>
+                {userEmail ? (
+                  <>
+                    <Link href="/dashboard" className="btn-primary" style={{ justifyContent: 'center' }}>
+                      Back to Dashboard
+                    </Link>
+                    <Link href="/events" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', border: '1px solid #e2e0d8', color: '#5a5650', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', textDecoration: 'none' }}>
+                      <ArrowLeft size={16} /> All Events
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/events" className="btn-primary" style={{ justifyContent: 'center' }}>
+                      View All Events
+                    </Link>
+                    <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 28px', border: '1px solid #e2e0d8', color: '#5a5650', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', textDecoration: 'none' }}>
+                      <ArrowLeft size={16} /> Go to Homepage
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -382,7 +450,7 @@ function EventSubmitContent() {
           {/* Notice */}
           <div style={{ borderLeft: '4px solid #e7b605', background: 'rgba(231,182,5,0.06)', padding: '20px 24px', marginBottom: 40 }}>
             <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '15px', lineHeight: 1.7 }}>
-              <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#2a2820' }}>Review process:</strong> All submitted events are reviewed by our team within 2–3 business days. Approved events are promoted to all Founders Edge members and featured on the events page.
+              <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#2a2820' }}>Listing Policy:</strong> Your first event listing is 100% free! Additional listings require a Founders Edge membership. All submissions are reviewed by our team within 2–3 business days.
             </p>
           </div>
 
@@ -523,32 +591,39 @@ function EventSubmitContent() {
             </div>
 
             {/* Host Name + Contact Email */}
-            <div className="grid-form" style={{ marginBottom: 20 }}>
-              <div id="field-hostName">
-                <label style={labelStyle}>Host / Organizer Name <span style={{ color: '#e7b605' }}>*</span></label>
-                <input
-                  className="input-field"
-                  placeholder="Your name or organization"
-                  value={form.hostName}
-                  onChange={e => handleChange('hostName', e.target.value)}
-                  style={fieldStyle('hostName')}
-                />
-                {errors.hostName && <ErrorMsg msg={errors.hostName} />}
+            {userEmail ? (
+              <div className="grid-form" style={{ marginBottom: 20 }}>
+                <div id="field-hostName">
+                  <label style={labelStyle}>Host / Organizer Name <span style={{ color: '#e7b605' }}>*</span></label>
+                  <input className="input-field" placeholder="Your name or organization" value={form.hostName} onChange={e => handleChange('hostName', e.target.value)} style={fieldStyle('hostName')} />
+                  {errors.hostName && <ErrorMsg msg={errors.hostName} />}
+                </div>
+                <div id="field-contactEmail">
+                  <label style={labelStyle}>Contact Email <span style={{ color: '#e7b605' }}>*</span></label>
+                  <input className="input-field" type="email" placeholder="you@example.com" value={form.contactEmail} onChange={e => handleChange('contactEmail', e.target.value)} style={fieldStyle('contactEmail')} />
+                  {errors.contactEmail && <ErrorMsg msg={errors.contactEmail} />}
+                </div>
               </div>
-              <div id="field-contactEmail">
-                <label style={labelStyle}>Contact Email <span style={{ color: '#e7b605' }}>*</span></label>
-                <input
-                  className="input-field"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={form.contactEmail}
-                  onChange={e => handleChange('contactEmail', e.target.value)}
-                  style={fieldStyle('contactEmail')}
-                />
-                {errors.contactEmail && <ErrorMsg msg={errors.contactEmail} />}
+            ) : (
+              <div style={{ marginBottom: 20 }}>
+                <div className="grid-form" style={{ marginBottom: 20 }}>
+                  <div id="field-guestName">
+                    <label style={labelStyle}>Your Name <span style={{ color: '#e7b605' }}>*</span></label>
+                    <input className="input-field" placeholder="First and Last Name" value={form.guestName} onChange={e => handleChange('guestName', e.target.value)} style={fieldStyle('guestName')} />
+                    {errors.guestName && <ErrorMsg msg={errors.guestName} />}
+                  </div>
+                  <div id="field-guestEmail">
+                    <label style={labelStyle}>Your Contact Email <span style={{ color: '#e7b605' }}>*</span></label>
+                    <input className="input-field" type="email" placeholder="john@example.com" value={form.guestEmail} onChange={e => handleChange('guestEmail', e.target.value)} style={fieldStyle('guestEmail')} />
+                    {errors.guestEmail && <ErrorMsg msg={errors.guestEmail} />}
+                  </div>
+                </div>
+                <div id="field-guestBusiness">
+                  <label style={labelStyle}>Company / Organization Name (Optional)</label>
+                  <input className="input-field" placeholder="Acme Corp" value={form.guestBusiness} onChange={e => handleChange('guestBusiness', e.target.value)} style={{ margin: 0 }} />
+                </div>
               </div>
-            </div>
-
+            )}
             {/* Tags */}
             <div style={{ marginBottom: 32 }}>
               <label style={labelStyle}>Tags (comma-separated)</label>

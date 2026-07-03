@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { invalidateCache } from '@/lib/redis';
 import { rateLimit } from '@/lib/rate-limiter';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { validateBody } from '@/lib/validate';
+
+export class CreatePostDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Post content is required' })
+  content!: string;
+
+  @IsOptional()
+  @IsString()
+  authorName?: string;
+
+  @IsOptional()
+  @IsString()
+  authorBusiness?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedType?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  linkedUrl?: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +43,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Too Many Requests' }, { status: 429 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const { errors, data } = await validateBody(CreatePostDto, rawBody);
+    if (errors) {
+      return NextResponse.json({ success: false, error: 'Validation failed', details: errors }, { status: 400 });
+    }
+    const body = data;
 
     const content = body.content;
     const authorName = body.authorName || 'Member';

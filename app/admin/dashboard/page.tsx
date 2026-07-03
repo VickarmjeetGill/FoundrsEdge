@@ -19,7 +19,7 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type EventItem = { id: string | number; title: string; date: string; time: string; location: string; category: string; price: string; host: string; desc: string; featured: boolean; fromSubmission?: boolean; capacity?: number; duration?: string; tags?: string[] };
+type EventItem = { id: string | number; title: string; date: string; time: string; location: string; category: string; price: string; host: string; desc: string; featured: boolean; fromSubmission?: boolean; capacity?: number; duration?: string; tags?: string[]; status?: string };
 type DirectoryItem = { id: string | number; name: string; industry: string; location: string; desc: string; website: string; tags: string; featured: boolean; boosted: boolean };
 type ResourceItem = { id: string | number; title: string; category: string; url: string; tags: string; desc: string; featured: boolean };
 type AwardItem = { id: string | number; name: string; category: string; desc: string; nominationsOpen: boolean; awardDate: string; sponsor: string };
@@ -130,6 +130,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             capacity: e.capacity || 50,
             duration: e.duration || '2 Hours',
             tags: e.tags || [],
+            status: e.status || 'PENDING',
           }));
           setItems(mapped);
         }
@@ -518,7 +519,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
 
         <SubmitRow editing={editId !== null} onCancel={() => { setEditId(null); setForm(blankEvent); setErrors({}); }} addLabel="Add Event" />
       </form>
-      <ItemTable items={items} columns={['Title', 'Date', 'Category', 'Source', 'Featured']} getRow={i => [i.title, i.date || '—', i.category, i.fromSubmission ? '📋 Submission' : '✏️ Manual', i.featured ? 'Yes' : 'No']} onEdit={handleEdit} onDelete={handleDelete} />
+      <ItemTable items={items} columns={['Title', 'Date', 'Category', 'Source', 'Status', 'Featured']} getRow={i => [i.title, i.date || '—', i.category, i.fromSubmission ? '📋 Submission' : '✏️ Manual', i.status || 'PENDING', i.featured ? 'Yes' : 'No']} onEdit={handleEdit} onDelete={handleDelete} />
     </>
   );
 }
@@ -1028,9 +1029,64 @@ function ItemTable<T extends { id: string | number }>({ items, columns, getRow, 
   items: T[]; columns: string[]; getRow: (item: T) => string[]; onEdit: (item: T) => void; onDelete: (id: string | number) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<(string | number)[]>([]);
+
+  // Reset selected checkboxes whenever the items dataset changes (e.g. changing tabs or deleting items)
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [items]);
+
   if (items.length === 0) return null;
+
+  const isAllSelected = items.length > 0 && selectedIds.length === items.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(items.map(item => item.id));
+    }
+  };
+
+  const toggleSelectRow = (id: string | number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (confirm(`Are you sure you want to permanently delete the ${selectedIds.length} selected item(s)?`)) {
+      // Loop through all selected IDs and run page-provided delete handler
+      for (const id of selectedIds) {
+        await onDelete(id);
+      }
+      setSelectedIds([]);
+    }
+  };
+
   return (
     <div style={{ marginTop: 40, borderTop: '1px solid #e2e0d8', paddingTop: 32 }}>
+      {/* Bulk Actions Header */}
+      {selectedIds.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderBottom: 'none', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#5a5650', fontFamily: 'DM Sans, sans-serif', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={handleBulkDelete}
+              style={{ background: '#c0392b', color: '#fff', border: 'none', padding: '8px 16px', fontWeight: 700, fontSize: '12px', letterSpacing: '0.04em', textTransform: 'uppercase', borderRadius: 2, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+            >
+              Delete Selected
+            </button>
+            <button
+              onClick={() => setSelectedIds([])}
+              style={{ background: 'none', border: '1px solid #e2e0d8', color: '#5a5650', padding: '8px 16px', fontWeight: 700, fontSize: '12px', letterSpacing: '0.04em', textTransform: 'uppercase', borderRadius: 2, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+            >
+              Deselect All
+            </button>
+          </div>
+        </div>
+      )}
+
       <button type="button" onClick={() => setCollapsed(!collapsed)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: '#444', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer', marginBottom: 16, padding: 0 }}>
         {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         {items.length} existing {items.length === 1 ? 'entry' : 'entries'}
@@ -1040,10 +1096,18 @@ function ItemTable<T extends { id: string | number }>({ items, columns, getRow, 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'DM Sans, sans-serif', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #e2e0d8', background: '#fafaf8' }}>
+                <th style={{ padding: '10px 14px', width: 40, textAlign: 'left' }}>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer', accentColor: '#e7b605' }}
+                  />
+                </th>
                 {columns.map(col => (
                   <th key={col} style={{ padding: '10px 14px', textAlign: 'left', color: '#9a9585', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: '11px', whiteSpace: 'nowrap' }}>{col}</th>
                 ))}
-                <th style={{ padding: '10px 14px', textAlign: 'right', color: '#9a9585', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: '11px' }}>Actions</th>
+                <th style={{ padding: '10px 14px', textAlign: 'center', color: '#9a9585', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', fontSize: '11px', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1051,10 +1115,18 @@ function ItemTable<T extends { id: string | number }>({ items, columns, getRow, 
                 const row = getRow(item);
                 return (
                   <tr key={item.id} style={{ borderBottom: '1px solid #e2e0d8', background: idx % 2 === 0 ? '#fff' : '#fafaf8' }}>
+                    <td style={{ padding: '12px 14px', width: 40 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => toggleSelectRow(item.id)}
+                        style={{ cursor: 'pointer', accentColor: '#e7b605' }}
+                      />
+                    </td>
                     {row.map((cell, ci) => (
                       <td key={ci} style={{ padding: '12px 14px', color: ci === 0 ? '#111' : '#9a9585', fontWeight: ci === 0 ? 600 : 400, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cell}</td>
                     ))}
-                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                    <td style={{ padding: '12px 14px', display: 'flex', justifyContent: 'center' }}>
                       <ActionBtns onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />
                     </td>
                   </tr>

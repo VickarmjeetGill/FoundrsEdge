@@ -71,6 +71,10 @@ export default function EventsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
+
+  const [subscribedEmail, setSubscribedEmail] = useState('');
+  const [subscribeSuccess, setSubscribeSuccess] = useState(false);
+  const [showBookmarkInfo, setShowBookmarkInfo] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -163,9 +167,62 @@ export default function EventsPage() {
           <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: 'clamp(40px, 6vw, 72px)', color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.0, marginBottom: 16 }}>
             EVENTS &amp;<br /><span style={{ color: '#e7b605' }}>EXPERIENCES</span>
           </h1>
-          <p style={{ fontFamily: 'Noto Serif, serif', color: '#999', fontSize: '18px', maxWidth: 520, lineHeight: 1.7 }}>
+          <p style={{ fontFamily: 'Noto Serif, serif', color: '#999', fontSize: '18px', maxWidth: 520, lineHeight: 1.7, marginBottom: 20 }}>
             From intimate supper clubs to hands-on workshops — every event is curated for Calgary's entrepreneurial community.
           </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
+            <button 
+              onClick={() => setShowBookmarkInfo(!showBookmarkInfo)}
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: 8, 
+                background: 'rgba(255,255,255,0.08)', 
+                border: '1px solid rgba(255,255,255,0.15)', 
+                color: '#fff', 
+                padding: '10px 18px', 
+                fontSize: '13px', 
+                fontWeight: 700, 
+                fontFamily: 'DM Sans, sans-serif', 
+                borderRadius: 0, 
+                cursor: 'pointer', 
+                transition: 'all 0.2s',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            >
+              <Star size={13} fill="#e7b605" stroke="#e7b605" /> Bookmark Calendar
+            </button>
+
+            {showBookmarkInfo && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: 12,
+                background: '#fff',
+                border: '1px solid #e2e0d8',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                padding: '20px',
+                zIndex: 99,
+                width: '320px',
+                textAlign: 'left'
+              }}>
+                <h4 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '14px', color: '#2a2820', margin: '0 0 8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Bookmark Calendar
+                  <button onClick={() => setShowBookmarkInfo(false)} style={{ background: 'none', border: 'none', color: '#9a9585', fontSize: '18px', cursor: 'pointer', padding: 0, lineHeight: 1 }}>&times;</button>
+                </h4>
+                <p style={{ color: '#5a5650', fontFamily: 'Noto Serif, serif', fontSize: '13px', lineHeight: 1.6, margin: 0 }}>
+                  Press <kbd style={{ background: '#f0efe9', padding: '2px 6px', borderRadius: 3, border: '1px solid #cbd5e1', fontSize: '12px', fontFamily: 'sans-serif' }}>Ctrl + D</kbd> (Windows) or <kbd style={{ background: '#f0efe9', padding: '2px 6px', borderRadius: 3, border: '1px solid #cbd5e1', fontSize: '12px', fontFamily: 'sans-serif' }}>⌘ + D</kbd> (Mac) to quickly bookmark this calendar page.
+                </p>
+                <div style={{ marginTop: 12, borderTop: '1px solid #e2e0d8', paddingTop: 8, color: '#9a9585', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', lineHeight: 1.4 }}>
+                  On mobile devices, tap your browser's share icon and select <strong>"Add to Bookmarks"</strong> or <strong>"Add to Home Screen"</strong>.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -224,8 +281,10 @@ export default function EventsPage() {
       {/* Events List */}
       <div style={{ padding: '60px 0', background: '#f9f9f7' }}>
         <div className="container">
-          <div style={{ marginBottom: 24, color: '#9a9585', fontSize: '14px', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>
-            Showing {filtered.length} of {totalResults} event{totalResults !== 1 ? 's' : ''} found
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ color: '#9a9585', fontSize: '14px', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>
+              Showing {filtered.length} of {totalResults} event{totalResults !== 1 ? 's' : ''} found </div>
+            <Link href="/events/submit" className="btn-primary" style={{ padding: '10px 20px', fontSize: '13px' }}> Submit Event <ExternalLink size={16} /></Link>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -313,9 +372,9 @@ export default function EventsPage() {
                   <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
                     <div style={{
                       fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '24px',
-                      color: event.price === 'Free' ? '#2d7a3a' : event.price === 'Members' ? '#9b7011' : '#000',
+                      color: event.price?.toLowerCase() === 'free' ? '#2d7a3a' : event.price === 'Members' ? '#9b7011' : '#000',
                     }}>
-                      {event.price}
+                      {event.price?.toLowerCase() === 'free' ? 'Free' : event.price}
                     </div>
                     <Link href={`/events/${event.id}`} className="btn-primary" style={{ padding: '10px 20px', fontSize: '12px' }}>
                       View Event <ChevronRight size={14} />
@@ -370,6 +429,7 @@ export default function EventsPage() {
             </div>
           )}
 
+
           {/* Submit Event CTA */}
           <div style={{ marginTop: 48, background: '#000', padding: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
             <div>
@@ -378,6 +438,41 @@ export default function EventsPage() {
             </div>
             <Link href="/events/submit" className="btn-primary">Submit Event <ExternalLink size={16} /></Link>
           </div>
+          {/* Subscribe CTA */}
+          <div style={{ marginTop: 48, padding: '48px', background: '#fff', border: '1px solid #e2e0d8', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', color: '#2a2820', marginBottom: 8 }}>Get Weekly Event Alerts</h3>
+            <p style={{ color: '#5a5650', fontFamily: 'Noto Serif, serif', fontSize: '15px', lineHeight: 1.6, marginBottom: 24, maxWidth: '520px' }}>
+              Subscribe to get notified of new business networking events, startup mixers, and workshops sent straight to your email.
+            </p>
+
+            {subscribeSuccess ? (
+              <div style={{ background: 'rgba(231,182,5,0.08)', border: '1px solid #e7b605', color: '#9b7011', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', padding: '12px 24px', textAlign: 'center', width: '100%', maxWidth: '480px' }}>
+                ✓ You're subscribed! We'll keep you updated.
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (subscribedEmail.trim()) setSubscribeSuccess(true);
+                }}
+                style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%', maxWidth: '480px', justifyContent: 'center' }}
+              >
+                <input
+                  type="email"
+                  required
+                  className="input-field"
+                  placeholder="Enter your email address"
+                  value={subscribedEmail}
+                  onChange={(e) => setSubscribedEmail(e.target.value)}
+                  style={{ flex: 1, minWidth: '240px', margin: 0 }}
+                />
+                <button type="submit" className="btn-primary" style={{ padding: '14px 28px' }}>
+                  Subscribe
+                </button>
+              </form>
+            )}
+          </div>
+
         </div>
       </div>
     </PageLayout>
