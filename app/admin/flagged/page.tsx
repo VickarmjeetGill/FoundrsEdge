@@ -9,6 +9,7 @@ import {
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 
 type FlagStatus = 'pending' | 'resolved' | 'dismissed';
 
@@ -49,6 +50,8 @@ export default function AdminFlaggedPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
   const [preview, setPreview] = useState<FlagReport | null>(null);
+
+  useEscapeKey(preview !== null, () => setPreview(null));
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -197,8 +200,8 @@ export default function AdminFlaggedPage() {
 
       {/* Content preview modal */}
       {preview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
-          <div style={{ background: '#fff', padding: '36px', maxWidth: 560, width: '100%' }}>
+        <div onClick={() => setPreview(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
+          <div role="dialog" aria-modal="true" aria-label="Review flag report" onClick={e => e.stopPropagation()} style={{ background: '#fff', padding: '36px', maxWidth: 560, width: '100%' }}>
             <div style={{ fontSize: '11px', fontWeight: 800, color: '#c0392b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
               {preview.contentType} — {preview.reason}
             </div>

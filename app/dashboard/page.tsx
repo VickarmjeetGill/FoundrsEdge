@@ -11,6 +11,7 @@ import {
 import FeedSection from './FeedSection';
 import NotificationBell from './NotificationBell';
 import { computeProfileCompletion } from './profile-completion';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 import type { Nomination } from '@/app/awards/nominate/page';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
@@ -613,6 +614,8 @@ export default function DashboardPage() {
     message: '',
     onConfirm: () => { },
   });
+
+  useEscapeKey(confirmModal.isOpen, () => setConfirmModal(prev => ({ ...prev, isOpen: false })));
 
   const loadProfile = async () => {
     const res = await getProfile();
@@ -1508,7 +1511,9 @@ export default function DashboardPage() {
 
       {/* Custom Confirmation Modal */}
       {confirmModal.isOpen && (
-        <div style={{
+        <div
+          onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1521,7 +1526,12 @@ export default function DashboardPage() {
           justifyContent: 'center',
           zIndex: 9999,
         }}>
-          <div style={{
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={confirmModal.title}
+            onClick={e => e.stopPropagation()}
+            style={{
             background: '#fff',
             border: '1px solid #e2e0d8',
             padding: '32px',

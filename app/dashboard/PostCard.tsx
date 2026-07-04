@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Heart, MessageCircle, MoreHorizontal, Flag, ExternalLink, X } from 'lucide-react';
 import { type Post, getSessionId, timeAgo, pushNotification } from './feed-types';
 import CommentThread from './CommentThread';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 
 type Props = {
   post: Post;
@@ -21,6 +22,8 @@ export default function PostCard({ post, currentUserName, currentUserBusiness, o
   const [flagDetails, setFlagDetails]       = useState('');
   const [flagged, setFlagged]               = useState(false);
   const [liked, setLiked]                   = useState(() => post.likes.includes(getSessionId()));
+
+  useEscapeKey(showFlagModal, () => { setShowFlagModal(false); setFlagDetails(''); });
 
   if (post.removed) return null;
 
@@ -194,10 +197,11 @@ export default function PostCard({ post, currentUserName, currentUserBusiness, o
 
       {/* Flag modal — fixed overlay */}
       {showFlagModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20 }}>
-          <div style={{ background: '#fff', padding: '36px', maxWidth: 460, width: '100%', position: 'relative' }}>
+        <div onClick={() => { setShowFlagModal(false); setFlagDetails(''); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20 }}>
+          <div role="dialog" aria-modal="true" aria-label="Report this post" onClick={e => e.stopPropagation()} style={{ background: '#fff', padding: '36px', maxWidth: 460, width: '100%', position: 'relative' }}>
             <button
               onClick={() => { setShowFlagModal(false); setFlagDetails(''); }}
+              aria-label="Close report dialog"
               style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#9a9585' }}
             >
               <X size={18} />

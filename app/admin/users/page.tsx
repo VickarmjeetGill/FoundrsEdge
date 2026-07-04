@@ -7,6 +7,7 @@ import {
   LogOut, Search, UserCheck, UserX, Repeat, ShieldCheck, X, Activity,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
 
@@ -49,6 +50,8 @@ export default function AdminUsersPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [impersonateTarget, setImpersonateTarget] = useState<AdminUser | null>(null);
+
+  useEscapeKey(impersonateTarget !== null, () => setImpersonateTarget(null));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState<string>('Action Failed');
 
@@ -232,9 +235,9 @@ export default function AdminUsersPage() {
 
       {/* Impersonate confirm modal */}
       {impersonateTarget && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
-          <div style={{ background: '#fff', padding: '36px', maxWidth: 460, width: '100%', position: 'relative' }}>
-            <button onClick={() => setImpersonateTarget(null)} aria-label="Close" style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#9a9585' }}>
+        <div onClick={() => setImpersonateTarget(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
+          <div role="dialog" aria-modal="true" aria-label={`Impersonate ${impersonateTarget.name}`} onClick={e => e.stopPropagation()} style={{ background: '#fff', padding: '36px', maxWidth: 460, width: '100%', position: 'relative' }}>
+            <button onClick={() => setImpersonateTarget(null)} aria-label="Close dialog" style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#9a9585' }}>
               <X size={18} />
             </button>
             <div style={{ fontSize: '11px', fontWeight: 800, color: '#9b7011', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Impersonate User</div>
