@@ -85,6 +85,9 @@ export default function PostCard({ post, currentUserName, currentUserBusiness, o
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowMenu(!showMenu)}
+              aria-label="Post options"
+              aria-haspopup="menu"
+              aria-expanded={showMenu}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', color: '#9a9585', display: 'flex', alignItems: 'center', borderRadius: 2 }}
             >
               <MoreHorizontal size={18} />
