@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile } from '@/app/actions/profile';
 
-type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'business' | 'owners';
+type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners';
 
 const defaultMember = {
   name: 'Loading User',
@@ -51,6 +51,7 @@ const navItems: { icon: React.ElementType; label: string; section?: Section; hre
   { icon: Calendar, label: 'Events', section: 'events' },
   { icon: Tag, label: 'Offers', section: 'offers' },
   { icon: Trophy, label: 'Awards', section: 'awards' },
+  { icon: Building2, label: 'My Directory Profile', section: 'directoryProfile' },
   { icon: Building2, label: 'Business', section: 'business' },
   { icon: UserCircle, label: 'Owners', section: 'owners' },
   { icon: Users, label: 'My Matches', href: '/dashboard/matches' },
@@ -91,6 +92,7 @@ const sectionTitles: Record<Section, string> = {
   events: 'My Events',
   offers: 'My Offers',
   awards: 'My Awards',
+  directoryProfile: 'My Directory Profile',
   business: 'Business Profiles',
   owners: 'Owner Network',
 };
@@ -1221,49 +1223,49 @@ export default function DashboardPage() {
           )}
         </div>
 
-          {nomTotalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
-              <button
-                disabled={nomPage === 1}
-                onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
-                  cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
-                }}
-              >
-                Prev
-              </button>
-              
-              {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setNomPage(pageNum)}
-                  style={{
-                    padding: '8px 14px', border: '1px solid',
-                    borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
-                    background: nomPage === pageNum ? '#e7b605' : '#fff',
-                    color: nomPage === pageNum ? '#fff' : '#2a2820',
-                    cursor: 'pointer', fontWeight: 700, fontSize: '12px'
-                  }}
-                >
-                  {pageNum}
-                </button>
-              ))}
+        {nomTotalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
+            <button
+              disabled={nomPage === 1}
+              onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
+                cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+              }}
+            >
+              Prev
+            </button>
 
+            {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
               <button
-                disabled={nomPage === nomTotalPages}
-                onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
+                key={pageNum}
+                onClick={() => setNomPage(pageNum)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
-                  cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+                  padding: '8px 14px', border: '1px solid',
+                  borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
+                  background: nomPage === pageNum ? '#e7b605' : '#fff',
+                  color: nomPage === pageNum ? '#fff' : '#2a2820',
+                  cursor: 'pointer', fontWeight: 700, fontSize: '12px'
                 }}
               >
-                Next
+                {pageNum}
               </button>
-            </div>
-          )}
+            ))}
+
+            <button
+              disabled={nomPage === nomTotalPages}
+              onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
+                cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        )}
 
 
         <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
@@ -1505,6 +1507,7 @@ export default function DashboardPage() {
         {activeSection === 'events' && <EventsSection />}
         {activeSection === 'offers' && <OffersSection />}
         {activeSection === 'awards' && <AwardsSection />}
+        {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} />}
         {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
         {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
       </main>
@@ -1514,32 +1517,32 @@ export default function DashboardPage() {
         <div
           onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
           style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-        }}>
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}>
           <div
             role="alertdialog"
             aria-modal="true"
             aria-label={confirmModal.title}
             onClick={e => e.stopPropagation()}
             style={{
-            background: '#fff',
-            border: '1px solid #e2e0d8',
-            padding: '32px',
-            maxWidth: '440px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-          }}>
+              background: '#fff',
+              border: '1px solid #e2e0d8',
+              padding: '32px',
+              maxWidth: '440px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            }}>
             <h3 style={{
               fontFamily: 'DM Sans, sans-serif',
               fontWeight: 800,
