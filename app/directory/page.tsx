@@ -120,7 +120,7 @@ export default function DirectoryPage() {
                 )}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                   <span className="tag">{biz.industry}</span>
-                  {biz.featured && !biz.boosted && <span className="tag gold">Featured</span>}
+                  {biz.featured && <span className="tag gold">Featured</span>}
                 </div>
                 <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 8 }}>{biz.name}</h3>
                 <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, marginBottom: 16 }}>{biz.desc}</p>
