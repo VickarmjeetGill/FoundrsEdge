@@ -99,6 +99,45 @@ model offers {
   @@index([created_at])
 }
 
+/// Resource partners (organizations that supply curated resources to the hub).
+model partners {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  description   String?
+  website       String?
+  logo_url      String?
+  category      String?
+  contact_email String?
+  status        String      @default("ACTIVE")
+  featured      Boolean     @default(false)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @updatedAt @db.Timestamptz(6)
+  resources     resources[]
+
+  @@index([name])
+  @@index([status])
+}
+
+/// Curated resources shown on the Resources hub; optionally attached to a partner.
+model resources {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id  String?   @db.Uuid
+  title       String
+  description String?
+  url         String?
+  category    String
+  tags        String[]
+  featured    Boolean   @default(false)
+  status      String    @default("PUBLISHED")
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @updatedAt @db.Timestamptz(6)
+  partners    partners? @relation(fields: [partner_id], references: [id], onDelete: SetNull)
+
+  @@index([partner_id])
+  @@index([category])
+  @@index([status])
+}
+
 model events {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title          String

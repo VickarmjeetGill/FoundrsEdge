@@ -1,10 +1,21 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Search } from 'lucide-react';
+import { ExternalLink, Search, Building2 } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
+import { SkeletonCard } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 
-const resources: { id: number; title: string; category: string; desc: string; url: string; tags: string[]; featured: boolean }[] = [];
+type Resource = {
+  id: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  category: string;
+  tags: string[];
+  featured: boolean;
+  partners?: { id: string; name: string } | null;
+};
 
 const categories = ['All Categories', 'Funding', 'Business Services', 'Tax & Grants', 'Innovation & IP', 'Banking & Finance', 'Ecosystem', 'Export & Trade'];
 
@@ -16,11 +27,33 @@ const categoryIcons: Record<string, string> = {
 export default function ResourcesPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All Categories');
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  // Filter by type (category) server-side; search stays client-side.
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const qs = category !== 'All Categories' ? `?category=${encodeURIComponent(category)}` : '';
+      const res = await fetch(`/api/resources${qs}`);
+      if (!res.ok) { setLoadError(true); return; }
+      const data = await res.json();
+      setResources(Array.isArray(data.resources) ? data.resources : []);
+    } catch (err) {
+      console.error('Failed to load resources:', err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [category]);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = resources.filter(r => {
-    const matchSearch = r.title.toLowerCase().includes(search.toLowerCase()) || r.desc.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === 'All Categories' || r.category === category;
-    return matchSearch && matchCat;
+    const q = search.toLowerCase();
+    return !q || r.title.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q);
   });
 
   return (
@@ -55,39 +88,66 @@ export default function ResourcesPage() {
       <div style={{ padding: '60px 0', background: '#f9f9f7' }}>
         <div className="container">
           <div style={{ marginBottom: 20, color: '#9a9585', fontSize: '14px', fontWeight: 600 }}>
-            {filtered.length} resource{filtered.length !== 1 ? 's' : ''} found
+            {loading ? 'Loading resources…' : `${filtered.length} resource${filtered.length !== 1 ? 's' : ''} found`}
           </div>
 
-          {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '80px 40px', background: '#fff', border: '1px solid #e2e0d8' }}>
-              <div style={{ fontSize: '40px', marginBottom: 16 }}>📚</div>
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '18px', marginBottom: 8, color: '#2a2820' }}>No resources yet</div>
-              <div style={{ color: '#9a9585', fontFamily: 'Noto Serif, serif' }}>Resources will be added by our team shortly. Check back soon.</div>
+          {loading && (
+            <div className="grid-2">
+              {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
             </div>
           )}
 
-          <div className="grid-2">
-            {filtered.map(r => (
-              <div key={r.id} className="card" style={{ borderLeft: r.featured ? '4px solid #e7b605' : '4px solid transparent' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <span className="tag">{categoryIcons[r.category] || '📌'} {r.category}</span>
-                    {r.featured && <span className="tag gold">Editor&apos;s Pick</span>}
-                  </div>
-                </div>
-                <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '18px', marginBottom: 8 }}>{r.title}</h3>
-                <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, marginBottom: 16 }}>{r.desc}</p>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-                  {r.tags.map(t => (
-                    <span key={t} style={{ padding: '3px 10px', fontSize: '11px', color: '#9a9585', fontWeight: 600, border: '1px solid #e2e0d8', borderRadius: 2 }}>{t}</span>
-                  ))}
-                </div>
-                <a href={r.url} className="btn-primary" style={{ padding: '10px 20px', fontSize: '12px', width: 'fit-content' }}>
-                  Visit Resource <ExternalLink size={14} />
-                </a>
+          {!loading && loadError && (
+            <div style={{ background: '#fff', border: '1px solid #e2e0d8' }}>
+              <ErrorState kind="network" onRetry={load} />
+            </div>
+          )}
+
+          {!loading && !loadError && filtered.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '80px 40px', background: '#fff', border: '1px solid #e2e0d8' }}>
+              <div style={{ fontSize: '40px', marginBottom: 16 }}>📚</div>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '18px', marginBottom: 8, color: '#2a2820' }}>
+                {search || category !== 'All Categories' ? 'No resources match your filters' : 'No resources yet'}
               </div>
-            ))}
-          </div>
+              <div style={{ color: '#9a9585', fontFamily: 'Noto Serif, serif' }}>
+                {search || category !== 'All Categories' ? 'Try a different type or search term.' : 'Resources will be added by our team shortly. Check back soon.'}
+              </div>
+            </div>
+          )}
+
+          {!loading && !loadError && filtered.length > 0 && (
+            <div className="grid-2">
+              {filtered.map(r => (
+                <div key={r.id} className="card" style={{ borderLeft: r.featured ? '4px solid #e7b605' : '4px solid transparent' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="tag">{categoryIcons[r.category] || '📌'} {r.category}</span>
+                      {r.featured && <span className="tag gold">Editor&apos;s Pick</span>}
+                    </div>
+                  </div>
+                  <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '18px', marginBottom: 8 }}>{r.title}</h3>
+                  {r.partners && (
+                    <Link href={`/partners/${r.partners.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '12px', color: '#9b7011', fontWeight: 700, textDecoration: 'none', marginBottom: 10 }}>
+                      <Building2 size={12} /> {r.partners.name}
+                    </Link>
+                  )}
+                  {r.description && <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, marginBottom: 16 }}>{r.description}</p>}
+                  {r.tags.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                      {r.tags.map(t => (
+                        <span key={t} style={{ padding: '3px 10px', fontSize: '11px', color: '#9a9585', fontWeight: 600, border: '1px solid #e2e0d8', borderRadius: 2 }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  {r.url && (
+                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ padding: '10px 20px', fontSize: '12px', width: 'fit-content' }}>
+                      Visit Resource <ExternalLink size={14} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </PageLayout>
