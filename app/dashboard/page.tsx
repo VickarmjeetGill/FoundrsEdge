@@ -6,18 +6,20 @@ import {
   Settings, Calendar, Building2, Users, BookOpen, Trophy, Star,
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
-  UserCircle, Globe, MapPin, Rss,
+  UserCircle, Globe, MapPin, Rss, Sparkles
 } from 'lucide-react';
 import FeedSection from './FeedSection';
+import RoadmapSection from './RoadmapSection';
+import StepCard from './StepCard';
 import NotificationBell from './NotificationBell';
 import { computeProfileCompletion } from './profile-completion';
 import type { Nomination } from '@/app/awards/nominate/page';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
-import { getProfile } from '@/app/actions/profile';
+import { getProfile, getRoadmap, toggleStepCompletion } from '@/app/actions/profile';
 
-type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'business' | 'owners';
+type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'business' | 'owners' | 'roadmap' | 'matches';
 
 const defaultMember = {
   name: 'Loading User',
@@ -47,12 +49,13 @@ const recommendations = {
 const navItems: { icon: React.ElementType; label: string; section?: Section; href?: string }[] = [
   { icon: Rss, label: 'Feed', section: 'feed' },
   { icon: TrendingUp, label: 'Dashboard', section: 'dashboard' },
+  { icon: CheckCircle, label: 'My Roadmap', section: 'roadmap' },
   { icon: Calendar, label: 'Events', section: 'events' },
   { icon: Tag, label: 'Offers', section: 'offers' },
   { icon: Trophy, label: 'Awards', section: 'awards' },
   { icon: Building2, label: 'Business', section: 'business' },
   { icon: UserCircle, label: 'Owners', section: 'owners' },
-  { icon: Users, label: 'My Matches', href: '/dashboard/matches' },
+  { icon: Users, label: 'My Matches', section: 'matches' },
   { icon: BookOpen, label: 'Resources', href: '/resources' },
   { icon: Star, label: 'Supper Club', href: '/supper-club' },
 ];
@@ -87,11 +90,13 @@ const statusStyles: Record<'pending' | 'approved' | 'rejected' | 'archived', { b
 const sectionTitles: Record<Section, string> = {
   dashboard: 'Dashboard',
   feed: 'Community Feed',
+  roadmap: 'My Roadmap',
   events: 'My Events',
   offers: 'My Offers',
   awards: 'My Awards',
   business: 'Business Profiles',
   owners: 'Owner Network',
+  matches: 'My Matches',
 };
 
 // ── Shared label style ───────────────────────────────────────────
@@ -320,6 +325,117 @@ function BusinessSection({ memberBusiness }: { memberBusiness: string }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Matches Section ──────────────────────────────────────────────
+function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
+  return (
+    <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '32px', borderRadius: '8px', marginBottom: '32px' }}>
+        <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '24px', margin: '0 0 6px 0', color: '#2a2820' }}>
+          My Curated Matches
+        </h2>
+        <p style={{ margin: 0, fontSize: '14px', color: '#9a9585', fontFamily: 'Noto Serif, serif', lineHeight: 1.5 }}>
+          These are customized recommendations based on your industry, stage, and referral criteria to help you grow.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+        {recommendations.matches.map((match, idx) => (
+          <div 
+            key={idx} 
+            style={{ 
+              background: '#fff', 
+              border: '1px solid #e2e0d8', 
+              borderRadius: '8px', 
+              padding: '24px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#e7b605';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(231,182,5,0.04)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#e2e0d8';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.01)';
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f0efe9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#2a2820', fontSize: '15px' }}>
+                  {match.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '16px', color: '#2a2820' }}>
+                    {match.name}
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#9a9585' }}>
+                    {match.business}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: '#fafaf9', padding: '12px 16px', borderRadius: '6px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '10px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                  Match Reason
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', color: '#5a5650', lineHeight: 1.4 }}>
+                  {match.reason}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0efe9', paddingTop: '16px' }}>
+              <span style={{ fontSize: '11px', color: '#9a9585', fontWeight: 600 }}>
+                {match.mutual} Mutual Connection{match.mutual !== 1 ? 's' : ''}
+              </span>
+              <button 
+                onClick={() => {
+                  setConfirmModal({
+                    isOpen: true,
+                    title: `Connect with ${match.name}`,
+                    message: `Would you like us to facilitate a warm email introduction to ${match.name} from ${match.business}?`,
+                    onConfirm: () => {
+                      setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
+                      alert(`Introduction request submitted! Our team will contact ${match.name} shortly.`);
+                    }
+                  });
+                }}
+                style={{
+                  background: '#000',
+                  border: '1px solid #000',
+                  color: '#fff',
+                  padding: '6px 14px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  fontFamily: 'DM Sans, sans-serif',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e7b605';
+                  e.currentTarget.style.borderColor = '#e7b605';
+                  e.currentTarget.style.color = '#000';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#000';
+                  e.currentTarget.style.borderColor = '#000';
+                  e.currentTarget.style.color = '#fff';
+                }}
+              >
+                Connect
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -592,6 +708,45 @@ export default function DashboardPage() {
   const [nomTotalPages, setNomTotalPages] = useState(1);
   const itemPerPage = 3;
 
+  const [roadmapSteps, setRoadmapSteps] = useState<any[]>([]);
+  const [completedStepIds, setCompletedStepIds] = useState<string[]>([]);
+  const [roadmapLoading, setRoadmapLoading] = useState(true);
+
+  const loadRoadmap = async () => {
+    try {
+      const res = await getRoadmap();
+      if (res.success && res.steps && res.progress) {
+        setRoadmapSteps(res.steps);
+        setCompletedStepIds(res.progress.filter((p: any) => p.completed).map((p: any) => p.stepId));
+      }
+    } catch (err) {
+      console.error('Failed to load roadmap for widget:', err);
+    } finally {
+      setRoadmapLoading(false);
+    }
+  };
+
+  const handleToggleWidgetStep = async (stepId: string) => {
+    const isCompleted = completedStepIds.includes(stepId);
+    
+    // Optimistic update
+    if (isCompleted) {
+      setCompletedStepIds(prev => prev.filter(id => id !== stepId));
+    } else {
+      setCompletedStepIds(prev => [...prev, stepId]);
+    }
+
+    try {
+      const res = await toggleStepCompletion(stepId, !isCompleted);
+      if (!res.success) {
+        loadRoadmap();
+      }
+    } catch (err) {
+      console.error(err);
+      loadRoadmap();
+    }
+  };
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -615,6 +770,11 @@ export default function DashboardPage() {
     const loggedInUser = res.user as any;
 
     setUserProfile(loggedInUser);
+
+    if (loggedInUser.role === 'MEMBER' && !loggedInUser.track) {
+      router.push('/onboarding');
+      return;
+    }
 
     const userEmail = loggedInUser.email || '';
     const userName = loggedInUser.name || 'Member';
@@ -694,6 +854,10 @@ export default function DashboardPage() {
       const res = await getProfile();
       if (!res.success || !res.user) {
         router.push('/login');
+        return;
+      }
+      if (res.user.role === 'MEMBER' && !res.user.track) {
+        router.push('/onboarding');
       }
     };
     verifyAuth();
@@ -797,6 +961,16 @@ export default function DashboardPage() {
   useEffect(() => {
     loadProfile();
     loadOffers();
+    loadRoadmap();
+
+    // Parse tab parameter from query string if present
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && ['dashboard', 'feed', 'events', 'offers', 'awards', 'business', 'owners', 'roadmap', 'matches'].includes(tab)) {
+        setActiveSection(tab as Section);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -1292,6 +1466,8 @@ export default function DashboardPage() {
       })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    const nextWidgetStep = roadmapSteps.find(step => !completedStepIds.includes(step.id));
+
     return (
       <div style={{ padding: '40px' }}>
         <div className="grid-4" style={{ gap: 2, marginBottom: 32 }}>
@@ -1311,6 +1487,60 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Roadmap Widget: Your Next Step This Week */}
+        {!roadmapLoading && nextWidgetStep && (
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Sparkles size={16} style={{ color: '#e7b605' }} />
+              <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Your Next Step This Week
+              </span>
+            </div>
+            <StepCard
+              weekNumber={nextWidgetStep.weekNumber}
+              title={nextWidgetStep.title}
+              description={nextWidgetStep.description}
+              actionText={nextWidgetStep.actionText}
+              actionHref={nextWidgetStep.actionHref}
+              completed={completedStepIds.includes(nextWidgetStep.id)}
+              onToggleComplete={() => handleToggleWidgetStep(nextWidgetStep.id)}
+            />
+          </div>
+        )}
+
+        {/* Roadmap Widget: Congratulate if 100% complete */}
+        {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
+          <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Sparkles size={16} style={{ color: '#a16207' }} />
+                <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Roadmap Complete! 🏆
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: '#713f12', fontWeight: 600 }}>
+                You've completed all items on your current track! Ready to keep growing?
+              </p>
+            </div>
+            <button 
+              onClick={() => setActiveSection('roadmap')}
+              style={{
+                background: '#000',
+                border: '1px solid #000',
+                color: '#fff',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 700,
+                fontFamily: 'DM Sans, sans-serif',
+                cursor: 'pointer'
+              }}
+            >
+              Switch Track
+            </button>
+          </div>
+        )}
 
         <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -1472,11 +1702,15 @@ export default function DashboardPage() {
         {/* Section content */}
         {activeSection === 'dashboard' && <DashboardSection />}
         {activeSection === 'feed' && <FeedSection memberName={member.name} memberBusiness={member.business} basics={{ email: userProfile?.email, industry: member.industry, stage: member.stage, avatarUrl: userProfile?.avatarUrl }} />}
+        {activeSection === 'roadmap' && userProfile && (
+          <RoadmapSection userProfile={userProfile} onProfileUpdate={(updatedUser) => setUserProfile(updatedUser)} />
+        )}
         {activeSection === 'events' && <EventsSection />}
         {activeSection === 'offers' && <OffersSection />}
         {activeSection === 'awards' && <AwardsSection />}
         {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
         {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
+        {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
       </main>
 
       {/* Custom Confirmation Modal */}

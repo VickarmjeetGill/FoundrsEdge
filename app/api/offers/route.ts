@@ -60,6 +60,10 @@ export class CreateOfferDto {
     howToRedeem?: string;
 
     @IsOptional()
+    @IsString()
+    promoCode?: string;
+
+    @IsOptional()
     @IsBoolean()
     agreeGuidelines?: boolean;
 }
@@ -120,24 +124,34 @@ export async function GET(request: NextRequest) {
             }
             const statusParam = searchParams.get('status');
             if (statusParam) {
-                andConditions.push({ status: statusParam });
+                andConditions.push({
+                    status: { equals: statusParam, mode: 'insensitive' }
+                });
             }
         } else if (mySubmissions) {
             const user = await getCurrentUser();
             if (!user) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
             }
-            const member = await prisma.members.findUnique({
+            let member = await prisma.members.findUnique({
                 where: { email: user.email },
             });
-            const memberId = member ? member.id : null;
-            if (memberId) {
-                andConditions.push({ member_id: memberId });
-            } else {
-                return NextResponse.json([]);
+            if (!member) {
+                const nameParts = (user.name || 'Test Member').trim().split(/\s+/);
+                const firstName = nameParts[0] || 'Test';
+                const lastName = nameParts.slice(1).join(' ') || 'Member';
+                member = await prisma.members.create({
+                    data: {
+                        email: user.email,
+                        first_name: firstName,
+                        last_name: lastName
+                    }
+                });
             }
+            andConditions.push({ member_id: member.id });
         } else {
             andConditions.push({ status: 'approved' });
+            andConditions.push({ is_passport: false });
         }
 
         if (category && category !== 'All Categories' && category !== 'All') {
@@ -182,14 +196,43 @@ export async function GET(request: NextRequest) {
                     featured: true,
                     location: true,
                     fe_discount: true,
+                    how_to_redeem: true,
+                    is_passport: true,
+                    passport_type: true,
+                    promo_code: true,
+                    events_page_url: true,
+                    members: {
+                        select: {
+                            first_name: true,
+                            last_name: true,
+                            email: true
+                        }
+                    }
                 }
             }),
             prisma.offers.count({ where })
         ]);
 
+        let stats = null;
+        if (adminView) {
+            const [totalCount, pendingCount, approvedCount, rejectedCount] = await Promise.all([
+                prisma.offers.count(),
+                prisma.offers.count({ where: { status: { equals: 'pending', mode: 'insensitive' } } }),
+                prisma.offers.count({ where: { status: { equals: 'approved', mode: 'insensitive' } } }),
+                prisma.offers.count({ where: { status: { equals: 'rejected', mode: 'insensitive' } } })
+            ]);
+            stats = {
+                total: totalCount,
+                pending: pendingCount,
+                approved: approvedCount,
+                rejected: rejectedCount
+            };
+        }
+
         if (isPaginated) {
             return NextResponse.json({
                 offers,
+                stats,
                 pagination: {
                     total,
                     page,
@@ -232,10 +275,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const member = await prisma.members.findUnique({
+        let member = await prisma.members.findUnique({
             where: { email: user.email },
         });
-        const memberId = member ? member.id : null;
+
+        if (!member) {
+            const nameParts = (user.name || 'Test Member').trim().split(/\s+/);
+            const firstName = nameParts[0] || 'Test';
+            const lastName = nameParts.slice(1).join(' ') || 'Member';
+            member = await prisma.members.create({
+                data: {
+                    email: user.email,
+                    first_name: firstName,
+                    last_name: lastName
+                }
+            });
+        }
+        const memberId = member.id;
 
         const existingBusiness = await prisma.businesses.findFirst({
             where: { business_name: data.businessName },
@@ -266,6 +322,7 @@ export async function POST(request: Request) {
                 fe_discount: data.foundersEdgeDiscount || null,
                 events_page_url: data.eventsPageUrl || null,
                 how_to_redeem: data.howToRedeem,
+                promo_code: data.promoCode || null,
                 is_affiliate: false,
                 status: 'pending',
             },

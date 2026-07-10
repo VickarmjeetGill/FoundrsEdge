@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Building2, BookOpen, Trophy, Video, Users, Star, LogOut, Plus, CheckCircle, X, Pencil, Trash2, ChevronDown, ChevronUp, LayoutDashboard, ClipboardList, Tag, Flag } from 'lucide-react';
+import { Calendar, Building2, BookOpen, Trophy, Video, Users, Star, LogOut, Plus, CheckCircle, X, Pencil, Trash2, ChevronDown, ChevronUp, LayoutDashboard, ClipboardList, Tag, Flag, Upload, Milestone } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -598,59 +598,297 @@ function DirectorySection({ onSuccess, setConfirmModal }: { onSuccess: (msg: str
 }
 
 // ─── RESOURCES ────────────────────────────────────────────────────────────────
-const blankRes = { title: '', category: 'Funding', url: '', tags: '', desc: '', featured: false };
+const blankPartner = { name: '', logo_url: '', short_desc: '', long_desc: '', website: '' };
+const blankRes = { partner_id: '', title: '', description: '', url: '', type: 'Grant', category: 'Funding', featured: false };
 
 function ResourcesSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string) => void; setConfirmModal: any }) {
-  const [items, setItems] = useState<ResourceItem[]>([]);
-  const [form, setForm] = useState(blankRes);
-  const [editId, setEditId] = useState<string | number | null>(null);
-  const [nextId, setNextId] = useState(1);
-  const set = (key: string, value: string | boolean) => setForm(prevForm => ({ ...prevForm, [key]: value }));
+  const [subTab, setSubTab] = useState<'partners' | 'resources'>('partners');
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (editId !== null) {
-      setItems(items.map(i => i.id === editId ? { ...form, id: editId } : i));
-      onSuccess('Resource updated.');
-      setEditId(null);
-    } else {
-      setItems([...items, { ...form, id: nextId }]);
-      setNextId(n => n + 1);
-      onSuccess('Resource added.');
+  // Partners state
+  const [partners, setPartners] = useState<any[]>([]);
+  const [partnerForm, setPartnerForm] = useState(blankPartner);
+  const [editPartnerId, setEditPartnerId] = useState<string | null>(null);
+
+  // Resources state
+  const [resourcesList, setResourcesList] = useState<any[]>([]);
+  const [resForm, setResForm] = useState(blankRes);
+  const [editResId, setEditResId] = useState<string | null>(null);
+
+  const setPartnerField = (key: string, value: string) => setPartnerForm(p => ({ ...p, [key]: value }));
+  const setResField = (key: string, value: string | boolean) => setResForm(p => ({ ...p, [key]: value }));
+
+  useEffect(() => {
+    loadPartners();
+    loadResources();
+  }, []);
+
+  async function loadPartners() {
+    try {
+      const res = await fetch('/api/partners');
+      if (res.ok) setPartners(await res.json());
+    } catch (err) {
+      console.error(err);
     }
-    setForm(blankRes);
   }
 
-  function handleEdit(item: ResourceItem) {
-    setForm({ title: item.title, category: item.category, url: item.url, tags: item.tags, desc: item.desc, featured: item.featured });
-    setEditId(item.id);
+  async function loadResources() {
+    try {
+      const res = await fetch('/api/resources');
+      if (res.ok) setResourcesList(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Partner Handlers
+  async function handlePartnerSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const url = editPartnerId ? `/api/partners/${editPartnerId}` : '/api/partners';
+      const method = editPartnerId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partnerForm)
+      });
+      if (res.ok) {
+        onSuccess(editPartnerId ? 'Partner updated.' : 'Partner added.');
+        setEditPartnerId(null);
+        setPartnerForm(blankPartner);
+        loadPartners();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPartnerField('logo_url', data.url);
+        onSuccess('Logo uploaded successfully.');
+      } else {
+        alert(data.error || 'Failed to upload image.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Upload failed.');
+    }
+  }
+
+  function handleEditPartner(partner: any) {
+    setPartnerForm({
+      name: partner.name || '',
+      logo_url: partner.logo_url || '',
+      short_desc: partner.short_desc || '',
+      long_desc: partner.long_desc || '',
+      website: partner.website || '',
+    });
+    setEditPartnerId(partner.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleDelete(id: string | number) {
+  function handleDeletePartner(id: string | number) {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Partner',
+      message: 'Are you sure you want to delete this partner? This will delete all their resources too.',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/partners/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            onSuccess('Partner deleted.');
+            loadPartners();
+            loadResources();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    });
+  }
+
+  // Resource Handlers
+  async function handleResSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const url = editResId ? `/api/resources/${editResId}` : '/api/resources';
+      const method = editResId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(resForm)
+      });
+      if (res.ok) {
+        onSuccess(editResId ? 'Resource updated.' : 'Resource added.');
+        setEditResId(null);
+        setResForm(blankRes);
+        loadResources();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function handleEditRes(resource: any) {
+    setResForm({
+      partner_id: resource.partner_id || '',
+      title: resource.title || '',
+      description: resource.description || '',
+      url: resource.url || '',
+      type: resource.type || 'Grant',
+      category: resource.category || 'Funding',
+      featured: resource.featured || false,
+    });
+    setEditResId(resource.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleDeleteRes(id: string | number) {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Resource',
       message: 'Are you sure you want to delete this resource?',
-      onConfirm: () => {
-        setItems(items.filter(i => i.id !== id));
-        onSuccess('Resource deleted.');
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/resources/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            onSuccess('Resource deleted.');
+            loadResources();
+          }
+        } catch (err) {
+          console.error(err);
+        }
       }
     });
   }
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="grid-form" style={{ gap: 20 }}>
-        <Field label="Resource Title"><input required style={inputStyle} value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Alberta Innovates Grant" /></Field>
-        <Field label="Category"><select style={inputStyle} value={form.category} onChange={e => set('category', e.target.value)}>{['Funding', 'Business Services', 'Tax & Grants', 'Innovation & IP', 'Banking & Finance', 'Ecosystem', 'Export & Trade'].map(c => <option key={c}>{c}</option>)}</select></Field>
-        <Field label="URL"><input required style={inputStyle} type="url" value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://..." /></Field>
-        <Field label="Tags (comma-separated)"><input style={inputStyle} value={form.tags} onChange={e => set('tags', e.target.value)} placeholder="e.g. Grant, Startup, Federal" /></Field>
-        <Field label="Editor's Pick"><label style={checkboxRowStyle}><input type="checkbox" checked={form.featured} onChange={e => set('featured', e.target.checked)} style={{ width: 16, height: 16, accentColor: '#e7b605' }} /> Mark as Editor's Pick</label></Field>
-        <div style={{ gridColumn: '1 / -1' }}><Field label="Description"><textarea style={textareaStyle} value={form.desc} onChange={e => set('desc', e.target.value)} placeholder="Describe this resource..." /></Field></div>
-        <SubmitRow editing={editId !== null} onCancel={() => { setEditId(null); setForm(blankRes); }} addLabel="Add Resource" />
-      </form>
-      <ItemTable items={items} columns={['Title', 'Category', "Editor's Pick"]} getRow={i => [i.title, i.category, i.featured ? 'Yes' : 'No']} onEdit={handleEdit} onDelete={handleDelete} />
+      <div style={{ display: 'flex', gap: 16, marginBottom: 32, borderBottom: '2px solid var(--gray-100)', paddingBottom: 16 }}>
+        <button
+          type="button"
+          onClick={() => setSubTab('partners')}
+          style={{
+            padding: '8px 16px', background: subTab === 'partners' ? 'var(--gold)' : 'transparent',
+            border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: '14px',
+            color: subTab === 'partners' ? 'var(--black)' : 'var(--gray-600)',
+          }}
+        >
+          Manage Partners
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab('resources')}
+          style={{
+            padding: '8px 16px', background: subTab === 'resources' ? 'var(--gold)' : 'transparent',
+            border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: '14px',
+            color: subTab === 'resources' ? 'var(--black)' : 'var(--gray-600)',
+          }}
+        >
+          Manage Resources
+        </button>
+      </div>
+
+      {subTab === 'partners' ? (
+        <>
+          <form onSubmit={handlePartnerSubmit} className="grid-form" style={{ gap: 20, marginBottom: 40 }}>
+            <Field label="Partner Name">
+              <input required style={inputStyle} value={partnerForm.name} onChange={e => setPartnerField('name', e.target.value)} placeholder="e.g. Platform Calgary" />
+            </Field>
+            <Field label="Logo URL">
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input style={{ ...inputStyle, flex: 1 }} value={partnerForm.logo_url} onChange={e => setPartnerField('logo_url', e.target.value)} placeholder="e.g. https://website.com/logo.png" />
+                <label style={{
+                  padding: '12px 16px', background: 'var(--black)', color: 'var(--gold)',
+                  borderRadius: '4px', cursor: 'pointer', border: '1px solid var(--gold)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', height: '42px', width: '45px'
+                }} title="Upload local image">
+                  <Upload size={18} />
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '4px', display: 'block', fontFamily: 'var(--font-sans)' }}>
+                Tip: Paste an image URL from the web or click the upload button to select a local file.
+              </span>
+            </Field>
+            <Field label="Website URL">
+              <input style={inputStyle} value={partnerForm.website} onChange={e => setPartnerField('website', e.target.value)} placeholder="https://..." />
+            </Field>
+            <Field label="Short Description">
+              <input style={inputStyle} value={partnerForm.short_desc} onChange={e => setPartnerField('short_desc', e.target.value)} placeholder="Brief summary for partner grid card..." />
+            </Field>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Long Description / Bio">
+                <textarea style={textareaStyle} value={partnerForm.long_desc} onChange={e => setPartnerField('long_desc', e.target.value)} placeholder="Full overview shown on partner profile page..." />
+              </Field>
+            </div>
+            <SubmitRow editing={editPartnerId !== null} onCancel={() => { setEditPartnerId(null); setPartnerForm(blankPartner); }} addLabel="Add Partner" />
+          </form>
+          <ItemTable
+            items={partners}
+            columns={['Name', 'Website', 'Short Desc']}
+            getRow={p => [p.name, p.website || 'N/A', p.short_desc || 'N/A']}
+            onEdit={handleEditPartner}
+            onDelete={handleDeletePartner}
+          />
+        </>
+      ) : (
+        <>
+          <form onSubmit={handleResSubmit} className="grid-form" style={{ gap: 20, marginBottom: 40 }}>
+            <Field label="Associated Partner">
+              <select required style={inputStyle} value={resForm.partner_id} onChange={e => setResField('partner_id', e.target.value)}>
+                <option value="">-- Select Partner --</option>
+                {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Resource Title">
+              <input required style={inputStyle} value={resForm.title} onChange={e => setResField('title', e.target.value)} placeholder="e.g. Voucher Program" />
+            </Field>
+            <Field label="Resource Type">
+              <select style={inputStyle} value={resForm.type} onChange={e => setResField('type', e.target.value)}>
+                {['Grant', 'Program', 'Discount', 'Tool', 'Advisory', 'Other'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Category">
+              <select style={inputStyle} value={resForm.category} onChange={e => setResField('category', e.target.value)}>
+                {['Funding', 'Business Services', 'Tax & Grants', 'Innovation & IP', 'Banking & Finance', 'Ecosystem', 'Export & Trade'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="URL">
+              <input required style={inputStyle} type="url" value={resForm.url} onChange={e => setResField('url', e.target.value)} placeholder="https://..." />
+            </Field>
+            <Field label="Editor's Pick">
+              <label style={checkboxRowStyle}>
+                <input type="checkbox" checked={resForm.featured} onChange={e => setResField('featured', e.target.checked)} style={{ width: 16, height: 16, accentColor: '#e7b605' }} />
+                Mark as Editor's Pick
+              </label>
+            </Field>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Description">
+                <textarea style={textareaStyle} value={resForm.description} onChange={e => setResField('description', e.target.value)} placeholder="Describe this resource..." />
+              </Field>
+            </div>
+            <SubmitRow editing={editResId !== null} onCancel={() => { setEditResId(null); setResForm(blankRes); }} addLabel="Add Resource" />
+          </form>
+          <ItemTable
+            items={resourcesList}
+            columns={['Title', 'Partner', 'Type', 'Category']}
+            getRow={r => [r.title, r.partner?.name || 'Unknown', r.type, r.category]}
+            onEdit={handleEditRes}
+            onDelete={handleDeleteRes}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -1192,7 +1430,7 @@ export default function AdminDashboard() {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   // Handle administrator log out and clear admin sessions
@@ -1245,34 +1483,39 @@ export default function AdminDashboard() {
 
       {/* Secondary Nav */}
       <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0 }}>
-          <Link href="/admin/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#e7b605', borderBottom: '2px solid #e7b605', transition: 'all 0.2s' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+          <Link href="/admin/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#e7b605', borderBottom: '2px solid #e7b605', transition: 'all 0.2s' }}>
             <LayoutDashboard size={14} /> Content Manager
           </Link>
-          <Link href="/admin/events" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/events" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <ClipboardList size={14} /> Review Events
           </Link>
-          <Link href="/admin/offers" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/offers" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Tag size={14} /> Review Offers
           </Link>
-          <Link href="/admin/awards" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/awards" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Trophy size={14} /> Review Awards
           </Link>
-          <Link href="/admin/flagged" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/flagged" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Flag size={14} /> Flagged Content
           </Link>
-          <Link href="/admin/users" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/users" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Users size={14} /> Users
+          </Link>
+          <Link href="/admin/roadmap" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
+            <Milestone size={14} /> Roadmap Editor
           </Link>
         </div>
       </div>

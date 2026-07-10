@@ -31,11 +31,11 @@ export default async function proxy(request: NextRequest) {
                 return NextResponse.redirect(new URL('/dashboard', request.nextUrl));
             }
 
-            const newSession = await encrypt({ userId: decodedRefresh.userId, role }, '15m');
+            const newSession = await encrypt({ userId: decodedRefresh.userId, role }, '30m');
             const response = NextResponse.next();
 
             response.cookies.set('session', newSession, {
-                expires: new Date(Date.now() + 15 * 60 * 1000),
+                expires: new Date(Date.now() + 30 * 60 * 1000),
                 httpOnly: true,
                 secure: true,
                 sameSite: 'lax',

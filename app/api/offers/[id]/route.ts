@@ -55,6 +55,7 @@ export async function PUT(
         fe_discount: data.foundersEdgeDiscount || null,
         events_page_url: data.eventsPageUrl || null,
         how_to_redeem: data.howToRedeem,
+        promo_code: data.promoCode || null,
         status: 'pending',
       },
     });

@@ -48,20 +48,59 @@ model members {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  password     String
-  name         String?
-  refreshToken String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  role         String   @default("MEMBER")
-  status       String   @default("ACTIVE")
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  password            String
+  name                String?
+  refreshToken        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  role                String   @default("MEMBER")
+  status              String   @default("ACTIVE")
 
-  avatarUrl String?
+  avatarUrl           String?
+  track               String?
+  completedMilestones String[]
+
+
+  roadmapProgress UserRoadmapProgress[]
 
   @@index([role])
   @@index([status])
+}
+
+model RoadmapStep {
+  id String @id @default(cuid())
+  track String 
+  weekNumber Int
+  title String
+  description String
+  actionText String
+  actionHref String
+  order Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress UserRoadmapProgress[]
+
+  @@index([track])
+  @@index([track, order])
+}
+
+model UserRoadmapProgress {
+  id String @id @default(cuid())
+  userId String
+  stepId String
+  completed Boolean @default(false)
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references :[id], onDelete: Cascade)
+  step RoadmapStep @relation(fields: [stepId], references :[id], onDelete: Cascade)
+
+  @@unique([userId, stepId])
+  @@index([userId])
+  @@index([stepId])
+
 }
 
 model offers {
@@ -86,6 +125,9 @@ model offers {
   featured        Boolean     @default(false)
   businesses      businesses? @relation(fields: [business_id], references: [id])
   members         members?    @relation(fields: [member_id], references: [id])
+  is_passport     Boolean @default(false)
+  passport_type String? 
+  promo_code    String? 
 
   @@index([member_id])
   @@index([business_id])
@@ -94,6 +136,7 @@ model offers {
   @@index([type])
   @@index([status, expiry_date])
   @@index([created_at])
+  @@index([is_passport])
 }
 
 model events {
@@ -281,3 +324,34 @@ model post_email_usage {
 
   @@index([email])
 }
+
+model partners {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  logo_url    String?     @map("logo_url")
+  short_desc  String?     @map("short_desc")
+  long_desc   String?     @map("long_desc")
+  website     String?
+  created_at  DateTime    @default(now()) @db.Timestamptz(6) @map("created_at")
+  updated_at  DateTime    @updatedAt @db.Timestamptz(6) @map("updated_at")
+  resources   resources[]
+}
+
+model resources {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id  String    @db.Uuid @map("partner_id")
+  title       String
+  description String
+  url         String
+  type        String    
+  category    String   
+  featured    Boolean   @default(false)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  updated_at  DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
+  partner     partners  @relation(fields: [partner_id], references: [id], onDelete: Cascade)
+
+  @@index([partner_id])
+  @@index([category])
+  @@index([type])
+}
+

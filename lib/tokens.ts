@@ -6,9 +6,9 @@ const key = new TextEncoder().encode(secretKey);
 /**
  * Encrypts a payload into a JWT.
  * @param payload - Data to store in the token
- * @param expiry - String duration (e.g., '15m', '7d')
+ * @param expiry - String duration (e.g., '30m', '7d')
  */
-export async function encrypt(payload: any, expiry: string = '15m') {
+export async function encrypt(payload: any, expiry: string = '30m') {
     return new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()

@@ -21,7 +21,7 @@ const navItems = [
   { icon: TrendingUp, label: 'Dashboard', href: '/dashboard' },
   { icon: Calendar, label: 'Events', href: '/events' },
   { icon: Building2, label: 'Directory', href: '/directory' },
-  { icon: Users, label: 'My Matches', href: '/dashboard/matches' },
+  { icon: Users, label: 'My Matches', href: '/dashboard?tab=matches' },
   { icon: BookOpen, label: 'Resources', href: '/resources' },
   { icon: Trophy, label: 'Awards', href: '/awards' },
   { icon: Star, label: 'Supper Club', href: '/supper-club' },
@@ -423,6 +423,64 @@ export default function SettingsPage() {
           <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '32px' }}>
             <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 6 }}>Profile Settings</h2>
             <p style={{ fontSize: '13px', color: '#9a9585', marginBottom: 32 }}>Update your personal representation across the Founders Edge platform.</p>
+
+            {/* Quick Links for Directory Profiles */}
+            <div style={{
+              background: '#fafaf9',
+              border: '1px solid #e2e0d8',
+              borderRadius: '8px',
+              padding: '20px',
+              marginBottom: '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '15px', margin: 0, color: '#2a2820' }}>
+                Complete Your Directory Profiles
+              </h3>
+              <p style={{ margin: 0, fontSize: '13px', color: '#666', lineHeight: 1.5 }}>
+                Founders Edge features separate directories for members (Owners) and their companies (Business). Ensure both are filled out to get matches!
+              </p>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                <Link 
+                  href="/dashboard?tab=owners"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#000',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    fontFamily: 'DM Sans, sans-serif',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <Users size={12} /> Edit Owner Profile
+                </Link>
+                <Link 
+                  href="/dashboard?tab=business"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    background: '#fff',
+                    border: '1px solid #e2e0d8',
+                    color: '#2a2820',
+                    textDecoration: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    fontFamily: 'DM Sans, sans-serif',
+                    borderRadius: '4px'
+                  }}
+                >
+                  <Building2 size={12} /> Edit Business Profile
+                </Link>
+              </div>
+            </div>
 
             {/* Avatar Uploader UI */}
             <div style={{ display: 'flex', gap: 32, alignItems: 'center', borderBottom: '1px solid #f0efe9', paddingBottom: 32, marginBottom: 32 }}>

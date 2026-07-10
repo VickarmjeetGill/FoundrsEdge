@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, MapPin, Tag, Percent, Gift, Zap, Building2, Trophy, Flag, Users } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, MapPin, Tag, Percent, Gift, Zap, Building2, Trophy, Flag, Users, Compass, Ticket, Milestone } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -37,6 +37,8 @@ export default function AdminOffersPage() {
   const [toast, setToast]             = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [expandedId, setExpandedId]   = useState<string | null>(null);
+  const [passportOffers, setPassportOffers] = useState<Record<string, { isPassport: boolean; type: 'ticket' | 'membership'; promoCode: string }>>({});
+  const [globalStats, setGlobalStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -77,13 +79,16 @@ export default function AdminOffersPage() {
           limit: itemsPerPage.toString(),
           adminView: 'true'
         });
-        if (tab !== 'All') queryParams.append('status', tab.toUpperCase());
+        if (tab !== 'All') queryParams.append('status', tab.toLowerCase());
         if (search) queryParams.append('search', search);
 
         const res = await fetch(`/api/offers?${queryParams.toString()}`);
         if (res.ok) {
           const data = await res.json();
           const dbData = data.offers || [];
+          if (data.stats) {
+            setGlobalStats(data.stats);
+          }
           if (data.pagination) {
             setTotalPages(data.pagination.totalPages);
             setTotalResults(data.pagination.total);
@@ -108,9 +113,23 @@ export default function AdminOffersPage() {
             submittedAt: o.created_at || o.created_At || new Date().toISOString(),
             foundersEdgeDiscount: o.fe_discount,
             eventsPageUrl: o.events_page_url,
-            howToRedeem: o.how_to_redeem
+            howToRedeem: o.how_to_redeem,
+            isPassport: o.is_passport || false,
+            passportType: o.passport_type || 'ticket',
+            promoCode: o.promo_code || '',
+            submittedBy: o.members ? `${o.members.first_name} ${o.members.last_name} (${o.members.email})` : 'System / Admin'
           }));
           setOffers(mapped);
+
+          const pOffers: Record<string, { isPassport: boolean; type: 'ticket' | 'membership'; promoCode: string }> = {};
+          dbData.forEach((o: any) => {
+            pOffers[o.id] = {
+              isPassport: o.is_passport || false,
+              type: (o.passport_type as any) || 'ticket',
+              promoCode: o.promo_code || ''
+            };
+          });
+          setPassportOffers(pOffers);
         }
       } catch (err) {
         console.error("Failed to load admin offers:", err);
@@ -124,8 +143,24 @@ export default function AdminOffersPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
+  function updateGlobalStats(fromStatus: string, toStatus: string) {
+    setGlobalStats(prev => {
+      const copy = { ...prev };
+      if (fromStatus === 'pending') copy.pending = Math.max(0, copy.pending - 1);
+      else if (fromStatus === 'approved') copy.approved = Math.max(0, copy.approved - 1);
+      else if (fromStatus === 'rejected') copy.rejected = Math.max(0, copy.rejected - 1);
+
+      if (toStatus === 'pending') copy.pending += 1;
+      else if (toStatus === 'approved') copy.approved += 1;
+      else if (toStatus === 'rejected') copy.rejected += 1;
+      return copy;
+    });
+  }
+
   async function approve(id: string) {
     try {
+      const target = offers.find(o => o.id === id);
+      const prevStatus = target ? target.status : 'pending';
       const res = await fetch(`/api/offers/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -133,6 +168,7 @@ export default function AdminOffersPage() {
       });
       if (res.ok) {
         setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'approved' } : o));
+        updateGlobalStats(prevStatus, 'approved');
         showToast('Offer approved ✓');
       } else {
         const data = await res.json();
@@ -145,6 +181,8 @@ export default function AdminOffersPage() {
 
   async function reject(id: string) {
     try {
+      const target = offers.find(o => o.id === id);
+      const prevStatus = target ? target.status : 'pending';
       const res = await fetch(`/api/offers/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +190,7 @@ export default function AdminOffersPage() {
       });
       if (res.ok) {
         setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'rejected' } : o));
+        updateGlobalStats(prevStatus, 'rejected');
         showToast('Offer rejected.');
       } else {
         const data = await res.json();
@@ -181,14 +220,32 @@ export default function AdminOffersPage() {
     }
   }
 
+  async function updatePassportStatus(id: string, isPassport: boolean, type: 'ticket' | 'membership', promoCode: string) {
+    try {
+      const res = await fetch(`/api/offers/${id}/passport`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPassport, passportType: type, promoCode })
+      });
+      if (res.ok) {
+        setPassportOffers(prev => ({
+          ...prev,
+          [id]: { isPassport, type, promoCode }
+        }));
+        showToast(isPassport ? 'Added to Passport ✓' : 'Removed from Passport');
+      } else {
+        const data = await res.json();
+        alert(`Error updating passport status: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error("Failed to update passport status:", err);
+      alert("Failed to update passport status");
+    }
+  }
+
   const filtered = offers;
 
-  const stats = {
-    total:    offers.length,
-    pending:  offers.filter(o => o.status === 'pending').length,
-    approved: offers.filter(o => o.status === 'approved').length,
-    rejected: offers.filter(o => o.status === 'rejected').length,
-  };
+  const stats = globalStats;
 
   if (!authChecked) {
     return (
@@ -222,10 +279,10 @@ export default function AdminOffersPage() {
 
       {/* ── Secondary Nav ── */}
       <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, overflowX: 'auto', whiteSpace: 'nowrap' }}>
           <Link
             href="/admin/dashboard"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}
           >
@@ -233,7 +290,7 @@ export default function AdminOffersPage() {
           </Link>
           <Link
             href="/admin/events"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}
           >
@@ -241,27 +298,33 @@ export default function AdminOffersPage() {
           </Link>
           <Link
             href="/admin/offers"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#e7b605', borderBottom: '2px solid #e7b605', transition: 'all 0.2s' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#e7b605', borderBottom: '2px solid #e7b605', transition: 'all 0.2s' }}
           >
             <Tag size={14} /> Review Offers
           </Link>
-          <Link href="/admin/awards" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/awards" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Trophy size={14} /> Review Awards
           </Link>
-          <Link href="/admin/flagged" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/flagged" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Flag size={14} /> Flagged Content
           </Link>
-          <Link href="/admin/users" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+          <Link href="/admin/users" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Users size={14} /> Users
           </Link>
+          <Link href="/admin/roadmap" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
+            <Milestone size={14} /> Roadmap Editor
+          </Link>
         </div>
       </div>
+
 
       {/* ── Content ── */}
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 40px' }}>
@@ -368,6 +431,25 @@ export default function AdminOffersPage() {
                     {sc.label}
                   </span>
 
+                  {passportOffers[offer.id]?.isPassport && (
+                    <span style={{ 
+                      padding: '4px 10px', 
+                      background: 'rgba(231,182,5,0.08)', 
+                      color: '#9b7011', 
+                      border: '1px solid rgba(231,182,5,0.2)',
+                      fontSize: '11px', 
+                      fontWeight: 800, 
+                      letterSpacing: '0.06em', 
+                      textTransform: 'uppercase', 
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      <Compass size={11} /> Passport: {passportOffers[offer.id].type === 'ticket' ? 'Ticket' : 'Club'}
+                    </span>
+                  )}
+
                   {offer.featured && <Star size={14} fill="#e7b605" stroke="#9b7011" style={{ flexShrink: 0 }} />}
 
                   <div style={{ color: '#9a9585', flexShrink: 0 }}>
@@ -382,11 +464,20 @@ export default function AdminOffersPage() {
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 8 }}>Description</div>
                         <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, margin: 0 }}>{offer.description}</p>
+
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 8 }}>How to Redeem</div>
+                          <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, margin: 0 }}>{offer.howToRedeem || 'No redemption instructions provided.'}</p>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div>
                           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 4 }}>Business</div>
                           <div style={{ fontWeight: 700, fontSize: '14px', color: '#2a2820' }}>{offer.businessName}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 4 }}>Submitted By</div>
+                          <div style={{ fontSize: '13px', color: '#5a5650', fontWeight: 600 }}>{offer.submittedBy}</div>
                         </div>
                         <div>
                           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 4 }}>Submitted</div>
@@ -421,6 +512,107 @@ export default function AdminOffersPage() {
                         </button>
                       )}
                       {offer.status === 'approved' && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              const current = passportOffers[offer.id] || { isPassport: false, type: 'ticket', promoCode: '' };
+                              updatePassportStatus(offer.id, !current.isPassport, current.type, current.promoCode);
+                            }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: passportOffers[offer.id]?.isPassport ? 'rgba(231,182,5,0.15)' : 'transparent', color: passportOffers[offer.id]?.isPassport ? '#9b7011' : '#5a5650', border: '1px solid', borderColor: passportOffers[offer.id]?.isPassport ? '#e7b605' : '#e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', letterSpacing: '0.04em' }}
+                          >
+                            <Compass size={13} fill={passportOffers[offer.id]?.isPassport ? '#e7b605' : 'none'} />
+                            {passportOffers[offer.id]?.isPassport ? 'In Passport' : 'Add to Passport'}
+                          </button>
+
+                          {passportOffers[offer.id]?.isPassport && (
+                            <>
+                              <select
+                                value={passportOffers[offer.id]?.type || 'ticket'}
+                                onChange={(e) => {
+                                  const newType = e.target.value as 'ticket' | 'membership';
+                                  const current = passportOffers[offer.id] || { isPassport: true, type: 'ticket', promoCode: '' };
+                                  updatePassportStatus(offer.id, true, newType, current.promoCode);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  border: '1px solid #e2e0d8',
+                                  background: '#fff',
+                                  fontFamily: 'DM Sans, sans-serif',
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  color: '#2a2820',
+                                  outline: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <option value="ticket">Event Ticket</option>
+                                <option value="membership">Club Membership</option>
+                              </select>
+
+                              <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Promo Code (e.g. FE-GOLD)"
+                                  value={passportOffers[offer.id]?.promoCode || ''}
+                                  onChange={(e) => {
+                                    const newCode = e.target.value;
+                                    setPassportOffers(prev => ({
+                                      ...prev,
+                                      [offer.id]: { ...(prev[offer.id] || { isPassport: true, type: 'ticket', promoCode: '' }), promoCode: newCode }
+                                    }));
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const current = passportOffers[offer.id] || { isPassport: true, type: 'ticket', promoCode: '' };
+                                      updatePassportStatus(offer.id, true, current.type, current.promoCode);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const val = e.target.value;
+                                    const current = passportOffers[offer.id] || { isPassport: true, type: 'ticket', promoCode: '' };
+                                    updatePassportStatus(offer.id, true, current.type, val);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    border: '1px solid #e2e0d8',
+                                    borderRight: 'none',
+                                    background: '#fff',
+                                    fontFamily: 'DM Sans, sans-serif',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    color: '#2a2820',
+                                    outline: 'none',
+                                    width: '180px',
+                                    borderRadius: '0px'
+                                  }}
+                                />
+                                <button
+                                  onClick={() => {
+                                    const current = passportOffers[offer.id] || { isPassport: true, type: 'ticket', promoCode: '' };
+                                    updatePassportStatus(offer.id, true, current.type, current.promoCode);
+                                  }}
+                                  title="Save Promo Code"
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: '#27ae60',
+                                    color: '#fff',
+                                    border: '1px solid #27ae60',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    height: '37px', // Matches input height
+                                    borderRadius: '0px'
+                                  }}
+                                >
+                                  <CheckCircle size={14} />
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {offer.status === 'approved' && !passportOffers[offer.id]?.isPassport && (
                         <button
                           onClick={() => toggleFeatured(offer.id, offer.featured)}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: offer.featured ? 'rgba(231,182,5,0.15)' : 'transparent', color: offer.featured ? '#9b7011' : '#5a5650', border: '1px solid', borderColor: offer.featured ? '#e7b605' : '#e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', letterSpacing: '0.04em' }}
@@ -431,11 +623,11 @@ export default function AdminOffersPage() {
                       )}
                       {offer.status === 'approved' && (
                         <Link
-                          href={`/offers/${offer.id}`}
+                          href={passportOffers[offer.id]?.isPassport ? '/passport' : `/offers/${offer.id}`}
                           target="_blank"
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', color: '#5a5650', textDecoration: 'none', letterSpacing: '0.04em' }}
                         >
-                          View Live
+                          {passportOffers[offer.id]?.isPassport ? 'View in Passport' : 'View Live'}
                         </Link>
                       )}
                     </div>

@@ -22,6 +22,7 @@ type FormData = {
   foundersEdgeDiscount: string;
   eventsPageUrl: string;
   howToRedeem: string;
+  promoCode: string;
   agreeGuidelines: boolean;
 };
 
@@ -41,6 +42,7 @@ const initialForm: FormData = {
   foundersEdgeDiscount: '',
   eventsPageUrl: '',
   howToRedeem: '',
+  promoCode: '',
   agreeGuidelines: false,
 };
 
@@ -138,6 +140,7 @@ function OfferSubmitContent() {
             foundersEdgeDiscount: found.fe_discount || '',
             eventsPageUrl: found.events_page_url || '',
             howToRedeem: found.how_to_redeem || '',
+            promoCode: found.promo_code || '',
             agreeGuidelines: true,
           });
         }
@@ -462,22 +465,40 @@ function OfferSubmitContent() {
                 </div>
               </div>
 
-              {/* Events Page Link */}
+              {/* Redemption / Booking Link */}
               <div style={{ marginTop: 20 }}>
                 <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
-                  Your Events Page Link
+                  Redemption / Booking Link
                 </label>
                 <input
                   className="input-field"
                   type="url"
                   value={form.eventsPageUrl}
                   onChange={e => handleChange('eventsPageUrl', e.target.value)}
-                  placeholder="https://yourbusiness.com/events"
+                  placeholder="https://yourbusiness.com/redeem"
                   style={{ margin: 0 }}
                   disabled={atLimit}
                 />
                 <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 6, fontFamily: 'Noto Serif, serif' }}>
-                  Optional — link members directly to your events or booking page.
+                  Optional — link members directly to your events, booking page, or website checkout.
+                </div>
+              </div>
+
+              {/* Promo Code */}
+              <div style={{ marginTop: 20 }}>
+                <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
+                  Promo Code
+                </label>
+                <input
+                  className="input-field"
+                  value={form.promoCode}
+                  onChange={e => handleChange('promoCode', e.target.value)}
+                  placeholder="e.g. FE-50OFF"
+                  style={{ margin: 0 }}
+                  disabled={atLimit}
+                />
+                <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 6, fontFamily: 'Noto Serif, serif' }}>
+                  Optional — if you have a discount code set up for Founders Edge members, enter it here.
                 </div>
               </div>
 

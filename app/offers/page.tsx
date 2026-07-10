@@ -21,6 +21,10 @@ export type Offer = {
   foundersEdgeDiscount?: string;
   eventsPageUrl?: string;
   howToRedeem?: string;
+  isPassport?: boolean;
+  passportType?: 'ticket' | 'membership';
+  promoCode?: string;
+  submittedBy?: string;
 };
 
 const offerCategories = [

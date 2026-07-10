@@ -9,6 +9,7 @@ import { getProfile } from '@/app/actions/profile';
 const navLinks = [
   { label: 'Membership', href: '/membership' },
   { label: 'Events', href: '/events' },
+  { label: 'Passport', href: '/passport' },
   { label: 'Directory', href: '/directory' },
   { label: 'Resources', href: '/resources' },
   { label: 'Awards', href: '/awards' },
@@ -65,7 +66,7 @@ export default function Navbar() {
       transition: 'all 0.3s ease, top 0.15s ease',
       backdropFilter: scrolled ? 'blur(12px)' : 'none',
     }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 72 }}>
+      <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 72, maxWidth: '1440px' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
           <Logo />
         </Link>

@@ -22,7 +22,7 @@ async function main() {
     // Clean up existing data to avoid unique constraint conflicts on multiple seeds
     await prisma.businesses.deleteMany({});
     await prisma.members.deleteMany({});
-    await prisma.user.deleteMany({});
+    // await prisma.user.deleteMany({}); // Preserves manual test accounts
 
     console.log("👥 Seeding members and businesses...");
 
@@ -97,6 +97,132 @@ async function main() {
     console.log(`✅ Default user seeded!`);
     console.log(`👉 Login Email: ${testEmail}`);
     console.log(`👉 Password: ${testPassword}`);
+
+    console.log("🗺 Seeding default roadmap steps...");
+    
+    // Clean up existing steps first to prevent duplicates/drift
+    await prisma.roadmapStep.deleteMany({});
+    
+    const stepsData = [
+        // START track
+        {
+            track: "START",
+            weekNumber: 1,
+            title: "Complete Member Profile",
+            description: "Fill out your profile details to get introduced.",
+            actionText: "Edit Profile",
+            actionHref: "/dashboard/settings",
+            order: 1
+        },
+        {
+            track: "START",
+            weekNumber: 2,
+            title: "Connect with Matches",
+            description: "Reach out and connect with your recommended matches.",
+            actionText: "View Matches",
+            actionHref: "/dashboard?tab=matches",
+            order: 2
+        },
+        {
+            track: "START",
+            weekNumber: 3,
+            title: "Explore Resource Hub",
+            description: "Browse guides and playbooks in the Resource Hub.",
+            actionText: "Browse Resources",
+            actionHref: "/resources",
+            order: 3
+        },
+        {
+            track: "START",
+            weekNumber: 4,
+            title: "Offers and Awards",
+            description: "Explore member discounts and open award directories.",
+            actionText: "Explore Awards",
+            actionHref: "/awards",
+            order: 4
+        },
+        // GROW track
+        {
+            track: "GROW",
+            weekNumber: 1,
+            title: "Register for Local Events",
+            description: "Find and register for upcoming mixer events.",
+            actionText: "Browse Events",
+            actionHref: "/events",
+            order: 1
+        },
+        {
+            track: "GROW",
+            weekNumber: 2,
+            title: "Search Business Directory",
+            description: "Browse local businesses to find partners or clients.",
+            actionText: "Search Directory",
+            actionHref: "/directory",
+            order: 2
+        },
+        {
+            track: "GROW",
+            weekNumber: 3,
+            title: "Connect with Growth Matches",
+            description: "Connect with growth-stage referral matches.",
+            actionText: "View Matches",
+            actionHref: "/dashboard?tab=matches",
+            order: 3
+        },
+        {
+            track: "GROW",
+            weekNumber: 4,
+            title: "Watch Masterclasses",
+            description: "Watch expert webinars and business masterclasses.",
+            actionText: "Watch Webinars",
+            actionHref: "/webinars",
+            order: 4
+        },
+        // SCALE track
+        {
+            track: "SCALE",
+            weekNumber: 1,
+            title: "Share Offers & Awards",
+            description: "Submit a discount offer or nominate for awards.",
+            actionText: "Nominate for Awards",
+            actionHref: "/awards",
+            order: 1
+        },
+        {
+            track: "SCALE",
+            weekNumber: 2,
+            title: "RSVP to Supper Club",
+            description: "Join private dinner events with other scaling founders.",
+            actionText: "View Supper Club",
+            actionHref: "/supper-club",
+            order: 2
+        },
+        {
+            track: "SCALE",
+            weekNumber: 3,
+            title: "Connect with Advisory Matches",
+            description: "Connect with scaling mentors and advisors.",
+            actionText: "View Matches",
+            actionHref: "/dashboard?tab=matches",
+            order: 3
+        },
+        {
+            track: "SCALE",
+            weekNumber: 4,
+            title: "Scale Funding & Capital",
+            description: "Explore funding offers and expansion capital options.",
+            actionText: "View Funding Offers",
+            actionHref: "/offers",
+            order: 4
+        }
+    ];
+
+    for (const step of stepsData) {
+        await prisma.roadmapStep.create({
+            data: step
+        });
+    }
+    console.log(`✅ Seeded ${stepsData.length} roadmap steps successfully!`);
 }
 
 main()

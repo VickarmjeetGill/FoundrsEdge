@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Users, LayoutDashboard, ClipboardList, Tag, Trophy, Flag,
+  Users, LayoutDashboard, ClipboardList, Tag, Trophy, Flag, Milestone,
   LogOut, Search, UserCheck, UserX, Repeat, ShieldCheck, X,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
@@ -35,7 +35,7 @@ const tabs: TabFilter[] = ['All', 'Members', 'Admins', 'Suspended'];
 
 const navLinkBase: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8,
-  padding: '14px 20px', fontFamily: 'DM Sans, sans-serif',
+  padding: '14px 14px', fontFamily: 'DM Sans, sans-serif',
   fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em',
   textTransform: 'uppercase', textDecoration: 'none',
   color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s',
@@ -301,7 +301,7 @@ export default function AdminUsersPage() {
 
       {/* Secondary Nav */}
       <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, overflowX: 'auto', whiteSpace: 'nowrap' }}>
           <Link href="/admin/dashboard" style={navLinkBase}
             onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
@@ -329,6 +329,11 @@ export default function AdminUsersPage() {
           </Link>
           <Link href="/admin/users" style={{ ...navLinkBase, color: '#e7b605', borderBottom: '2px solid #e7b605' }}>
             <Users size={14} /> Users
+          </Link>
+          <Link href="/admin/roadmap" style={navLinkBase}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
+            <Milestone size={14} /> Roadmap Editor
           </Link>
         </div>
       </div>

@@ -15,11 +15,11 @@ export async function setSession(userId: string, impersonatorId?: string) {
     });
     const role = user?.role ?? "MEMBER";
 
-    const sessionExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
     const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    // 2. Generate both session JWT (15m) and refresh JWT (7d), carrying the role
-    const session = await encrypt({ userId, role, impersonatorId }, '15m');
+    // 2. Generate both session JWT (30m) and refresh JWT (7d), carrying the role
+    const session = await encrypt({ userId, role, impersonatorId }, '30m');
     const refreshToken = await encrypt({ userId, role, impersonatorId }, '7d');
 
     const cookieStore = await cookies();

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Milestone } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -173,7 +173,7 @@ export default function AdminAwardsPage() {
 
       {/* ── Secondary Nav ── */}
       <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0 }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, overflowX: 'auto', whiteSpace: 'nowrap' }}>
           {[
             { href: '/admin/dashboard', icon: <LayoutDashboard size={14} />, label: 'Content Manager', active: false },
             { href: '/admin/events', icon: <ClipboardList size={14} />, label: 'Review Events', active: false },
@@ -181,11 +181,12 @@ export default function AdminAwardsPage() {
             { href: '/admin/awards', icon: <Trophy size={14} />, label: 'Review Awards', active: true },
             { href: '/admin/flagged', icon: <Flag size={14} />, label: 'Flagged Content', active: false },
             { href: '/admin/users', icon: <Users size={14} />, label: 'Users', active: false },
+            { href: '/admin/roadmap', icon: <Milestone size={14} />, label: 'Roadmap Editor', active: false },
           ].map(item => (
             <Link
               key={item.href}
               href={item.href}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: item.active ? '#e7b605' : '#888', borderBottom: item.active ? '2px solid #e7b605' : '2px solid transparent', transition: 'all 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: item.active ? '#e7b605' : '#888', borderBottom: item.active ? '2px solid #e7b605' : '2px solid transparent', transition: 'all 0.2s' }}
               onMouseEnter={item.active ? undefined : e => { e.currentTarget.style.color = '#ccc'; }}
               onMouseLeave={item.active ? undefined : e => { e.currentTarget.style.color = '#888'; }}
             >
