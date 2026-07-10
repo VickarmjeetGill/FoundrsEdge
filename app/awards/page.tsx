@@ -1,8 +1,10 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Trophy, Search, Calendar, MapPin, Star, ChevronRight, Clock, Tag, Filter } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
+import { SkeletonCard } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 export type Award = {
   id: string;
@@ -44,48 +46,53 @@ export default function AwardsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const itemPerPage = 3;
 
   useEffect(() => {
     setCurrentPage(1);
   }, [category, region, deadlineFilter, openOnly, search]);
 
-  useEffect(() => {
-    async function loadAwards() {
-      try {
-        const queryParams = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: itemPerPage.toString(),
-        });
+  const loadAwards = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemPerPage.toString(),
+      });
 
-        if (category !== 'All Categories') queryParams.append('category', category);
-        if (region !== 'All Regions') queryParams.append('region', region);
-        if (openOnly) queryParams.append('nominationsOpen', 'true');
-        if (search) queryParams.append('search', search);
-        if (deadlineFilter !== 'All Deadlines') queryParams.append('deadlineFilter', deadlineFilter);
+      if (category !== 'All Categories') queryParams.append('category', category);
+      if (region !== 'All Regions') queryParams.append('region', region);
+      if (openOnly) queryParams.append('nominationsOpen', 'true');
+      if (search) queryParams.append('search', search);
+      if (deadlineFilter !== 'All Deadlines') queryParams.append('deadlineFilter', deadlineFilter);
 
-        const res = await fetch(`/api/awards?${queryParams.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          const dbData = data.awards || [];
+      const res = await fetch(`/api/awards?${queryParams.toString()}`);
+      if (!res.ok) { setLoadError(true); return; }
+      const data = await res.json();
+      const dbData = data.awards || [];
 
-          if (data.pagination) {
-            setTotalPages(data.pagination.totalPages);
-            setTotalResults(data.pagination.total);
-          }
-
-          const mapped: Award[] = dbData.map((a: any) => ({
-            ...a,
-            awardDate: a.award_date || a.awardDate || '',
-          }));
-          setAwards(mapped);
-        }
-      } catch (error) {
-        console.error('Error fetching awards:', error);
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages);
+        setTotalResults(data.pagination.total);
       }
+
+      const mapped: Award[] = dbData.map((a: any) => ({
+        ...a,
+        awardDate: a.award_date || a.awardDate || '',
+      }));
+      setAwards(mapped);
+    } catch (error) {
+      console.error('Error fetching awards:', error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    loadAwards();
   }, [currentPage, category, region, openOnly, search, deadlineFilter]);
+
+  useEffect(() => { loadAwards(); }, [loadAwards]);
 
   const filtered = awards.filter(a => {
     const q = search.toLowerCase();
@@ -156,7 +163,19 @@ export default function AwardsPage() {
             Showing {filtered.length} of {totalResults} award{totalResults !== 1 ? 's' : ''} found
           </div>
 
-          {filtered.length === 0 && (
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          )}
+
+          {!loading && loadError && (
+            <div style={{ background: '#fff', border: '1px solid #e2e0d8' }}>
+              <ErrorState kind="network" onRetry={loadAwards} />
+            </div>
+          )}
+
+          {!loading && !loadError && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '80px 40px', background: '#fff', border: '1px solid #e2e0d8' }}>
               <Trophy size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
               <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '18px', marginBottom: 8 }}>No awards found</div>
@@ -165,7 +184,7 @@ export default function AwardsPage() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {filtered.map(award => {
+            {!loading && !loadError && filtered.map(award => {
               const days = daysUntil(award.deadline);
               const isUrgent = days !== null && days <= 30 && days >= 0;
               const isPast = days !== null && days < 0;

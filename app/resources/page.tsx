@@ -25,14 +25,14 @@ export default function ResourcesPage() {
         
         if (partnersRes.ok) {
           const partnersData = await partnersRes.json();
-          setPartners(partnersData);
+          setPartners(Array.isArray(partnersData) ? partnersData : partnersData.partners || []);
         } else {
           console.error('Failed to fetch partners');
         }
 
         if (resourcesRes.ok) {
           const resourcesData = await resourcesRes.json();
-          setResources(resourcesData);
+          setResources(Array.isArray(resourcesData) ? resourcesData : resourcesData.resources || []);
         } else {
           console.error('Failed to fetch resources');
         }
@@ -54,6 +54,7 @@ export default function ResourcesPage() {
     const term = search.toLowerCase();
     return (
       p.name.toLowerCase().includes(term) ||
+      (p.description && p.description.toLowerCase().includes(term)) ||
       (p.short_desc && p.short_desc.toLowerCase().includes(term))
     );
   });
@@ -62,7 +63,7 @@ export default function ResourcesPage() {
     const term = search.toLowerCase();
     const matchesSearch = 
       r.title.toLowerCase().includes(term) ||
-      r.description.toLowerCase().includes(term) ||
+      (r.description && r.description.toLowerCase().includes(term)) ||
       (r.partner?.name && r.partner.name.toLowerCase().includes(term));
 
     const matchesType = !selectedType || r.type === selectedType;
@@ -275,7 +276,7 @@ export default function ResourcesPage() {
                         </h3>
                         
                         <p style={{ fontFamily: 'var(--font-serif)', color: 'var(--gray-600)', fontSize: '14px', lineHeight: 1.6, flexGrow: 1, marginBottom: 20 }}>
-                          {partner.short_desc || 'No description available.'}
+                          {partner.description || partner.short_desc || 'No description available.'}
                         </p>
 
                         {/* Bottom Link Action */}
@@ -306,7 +307,6 @@ export default function ResourcesPage() {
               </div>
             )
           )}
-
         </div>
       </div>
     </PageLayout>

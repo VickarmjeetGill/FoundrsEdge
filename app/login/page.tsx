@@ -56,10 +56,11 @@ function LoginForm() {
 
         <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888', marginBottom: 8 }}>
+            <label htmlFor="login-email" style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888', marginBottom: 8 }}>
               Email Address
             </label>
             <input
+              id="login-email"
               name="email" // Added for the server action
               type="email"
               value={email}
@@ -103,13 +104,14 @@ function LoginForm() {
 
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888' }}>
+              <label htmlFor="login-password" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888' }}>
                 Password
               </label>
               <a href="#" style={{ fontSize: '12px', color: '#e7b605', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
             </div>
             <div style={{ position: 'relative' }}>
               <input
+                id="login-password"
                 name="password"
                 type={showPass ? 'text' : 'password'}
                 value={password}
@@ -119,7 +121,7 @@ function LoginForm() {
                 onFocus={e => (e.target.style.borderColor = '#e7b605')}
                 onBlur={e => (e.target.style.borderColor = '#2a2a2a')}
               />
-              <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>
+              <button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>

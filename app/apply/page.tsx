@@ -24,7 +24,31 @@ export default function ApplyPage() {
     firstName: '', lastName: '', email: '', phone: '', linkedin: '', hearAbout: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const errStyle: React.CSSProperties = { color: '#c0392b', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif', fontWeight: 600 };
+
+  function validateStep(s: number): boolean {
+    const e: Record<string, string> = {};
+    if (s === 0) {
+      if (!form.businessName.trim()) e.businessName = 'Business name is required.';
+      if (!form.businessDesc.trim()) e.businessDesc = 'Please describe what your business does.';
+      if (!form.industry) e.industry = 'Please select an industry.';
+    }
+    if (s === 2) {
+      if (!form.firstName.trim()) e.firstName = 'First name is required.';
+      if (!form.lastName.trim()) e.lastName = 'Last name is required.';
+      if (!form.email.trim()) e.email = 'Email address is required.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   const handleSubmit = async () => {
+  if (!validateStep(2)) return;
+  setSubmitting(true);
   const { data: member, error: memberError } = await supabase
     .from('members')
     .insert({
@@ -39,6 +63,7 @@ export default function ApplyPage() {
     .single();
 
   if (memberError) {
+    setSubmitting(false);
     alert(memberError.message);
     return;
   }
@@ -61,14 +86,19 @@ export default function ApplyPage() {
     });
 
   if (businessError) {
+    setSubmitting(false);
     alert(businessError.message);
     return;
   }
 
+  setSubmitting(false);
   setSubmitted(true);
 };
 
-  const update = (field: string, val: string | string[]) => setForm(f => ({ ...f, [field]: val }));
+  const update = (field: string, val: string | string[]) => {
+    setForm(f => ({ ...f, [field]: val }));
+    setErrors(prev => { if (!prev[field]) return prev; const n = { ...prev }; delete n[field]; return n; });
+  };
 
   const togglePriority = (p: string) => {
     const curr = form.priorities;
@@ -156,22 +186,25 @@ export default function ApplyPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Business Name *</label>
-                    <input className="input-field" value={form.businessName} onChange={e => update('businessName', e.target.value)} placeholder="e.g. NorthTech Solutions Inc." />
+                    <input className="input-field" value={form.businessName} onChange={e => update('businessName', e.target.value)} placeholder="e.g. NorthTech Solutions Inc." style={errors.businessName ? { borderColor: '#c0392b' } : undefined} />
+                    {errors.businessName && <p style={errStyle}>{errors.businessName}</p>}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>What does your business do? *</label>
-                    <textarea className="input-field" value={form.businessDesc} onChange={e => update('businessDesc', e.target.value)} placeholder="Describe your product/service, target customers, and what makes you unique..." style={{ height: 100, resize: 'vertical' }} />
+                    <textarea className="input-field" value={form.businessDesc} onChange={e => update('businessDesc', e.target.value)} placeholder="Describe your product/service, target customers, and what makes you unique..." style={{ height: 100, resize: 'vertical', ...(errors.businessDesc ? { borderColor: '#c0392b' } : {}) }} />
+                    {errors.businessDesc && <p style={errStyle}>{errors.businessDesc}</p>}
                   </div>
                   <div className="grid-form">
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Industry *</label>
                       <div style={{ position: 'relative' }}>
-                        <select className="select-field" value={form.industry} onChange={e => update('industry', e.target.value)}>
+                        <select className="select-field" value={form.industry} onChange={e => update('industry', e.target.value)} style={errors.industry ? { borderColor: '#c0392b' } : undefined}>
                           <option value="">Select industry...</option>
                           {industries.map(i => <option key={i}>{i}</option>)}
                         </select>
                         <ChevronDown size={16} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#9a9585', pointerEvents: 'none' }} />
                       </div>
+                      {errors.industry && <p style={errStyle}>{errors.industry}</p>}
                     </div>
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Annual Revenue</label>
@@ -358,16 +391,19 @@ export default function ApplyPage() {
                   <div className="grid-form">
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>First Name *</label>
-                      <input className="input-field" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder="Jordan" />
+                      <input className="input-field" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder="Jordan" style={errors.firstName ? { borderColor: '#c0392b' } : undefined} />
+                      {errors.firstName && <p style={errStyle}>{errors.firstName}</p>}
                     </div>
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Last Name *</label>
-                      <input className="input-field" value={form.lastName} onChange={e => update('lastName', e.target.value)} placeholder="Smith" />
+                      <input className="input-field" value={form.lastName} onChange={e => update('lastName', e.target.value)} placeholder="Smith" style={errors.lastName ? { borderColor: '#c0392b' } : undefined} />
+                      {errors.lastName && <p style={errStyle}>{errors.lastName}</p>}
                     </div>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Email Address *</label>
-                    <input className="input-field" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="jordan@yourcompany.com" />
+                    <input className="input-field" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="jordan@yourcompany.com" style={errors.email ? { borderColor: '#c0392b' } : undefined} />
+                    {errors.email && <p style={errStyle}>{errors.email}</p>}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Phone Number</label>
@@ -411,12 +447,12 @@ export default function ApplyPage() {
                 <ArrowLeft size={16} /> Back
               </button>
               {step < steps.length - 1 ? (
-                <button onClick={() => setStep(s => s + 1)} className="btn-primary">
+                <button onClick={() => { if (validateStep(step)) setStep(s => s + 1); }} className="btn-primary">
                   Continue <ArrowRight size={16} />
                 </button>
               ) : (
-                <button onClick={handleSubmit} className="btn-primary" style={{ background: '#e7b605' }}>
-                  Submit Application <Check size={16} />
+                <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{ background: '#e7b605', opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+                  {submitting ? 'Submitting…' : <>Submit Application <Check size={16} /></>}
                 </button>
               )}
             </div>

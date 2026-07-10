@@ -21,6 +21,9 @@ model businesses {
   referral_partner_industries String[]
   priorities                  String[]
   open_to_matching            Boolean?  @default(true)
+  status   String  @default("PENDING")
+featured Boolean @default(false)
+removed  Boolean @default(false)
   created_at                  DateTime? @default(now()) @db.Timestamptz(6)
   members                     members?  @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   offers                      offers[]
@@ -138,6 +141,49 @@ model offers {
   @@index([created_at])
   @@index([is_passport])
 }
+
+/// Resource partners (organizations that supply curated resources to the hub).
+model partners {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  description   String?
+  short_desc    String?     @map("short_desc")
+  long_desc     String?     @map("long_desc")
+  website       String?
+  logo_url      String?     @map("logo_url")
+  category      String?
+  contact_email String?
+  status        String      @default("ACTIVE")
+  featured      Boolean     @default(false)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6) @map("created_at")
+  updated_at    DateTime    @updatedAt @db.Timestamptz(6) @map("updated_at")
+  resources     resources[]
+
+  @@index([name])
+  @@index([status])
+}
+
+/// Curated resources shown on the Resources hub; optionally attached to a partner.
+model resources {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partner_id  String?   @db.Uuid @map("partner_id")
+  title       String
+  description String?
+  url         String?
+  type        String?
+  category    String
+  tags        String[]  @default([])
+  featured    Boolean   @default(false)
+  status      String    @default("PUBLISHED")
+  created_at  DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  updated_at  DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
+  partner     partners? @relation(fields: [partner_id], references: [id], onDelete: SetNull)
+
+  @@index([partner_id])
+  @@index([category])
+  @@index([status])
+}
+
 
 model events {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -325,33 +371,4 @@ model post_email_usage {
   @@index([email])
 }
 
-model partners {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  logo_url    String?     @map("logo_url")
-  short_desc  String?     @map("short_desc")
-  long_desc   String?     @map("long_desc")
-  website     String?
-  created_at  DateTime    @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at  DateTime    @updatedAt @db.Timestamptz(6) @map("updated_at")
-  resources   resources[]
-}
-
-model resources {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partner_id  String    @db.Uuid @map("partner_id")
-  title       String
-  description String
-  url         String
-  type        String    
-  category    String   
-  featured    Boolean   @default(false)
-  created_at  DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at  DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
-  partner     partners  @relation(fields: [partner_id], references: [id], onDelete: Cascade)
-
-  @@index([partner_id])
-  @@index([category])
-  @@index([type])
-}
 

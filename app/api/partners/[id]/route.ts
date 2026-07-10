@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// GET /api/partners/:id — public partner profile with its published resources.
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -12,9 +13,8 @@ export async function GET(
             where: { id },
             include: {
                 resources: {
-                    orderBy: {
-                        created_at: 'desc',
-                    },
+                    where: { status: 'PUBLISHED' },
+                    orderBy: [{ featured: 'desc' }, { created_at: 'desc' }],
                 },
             },
         });
@@ -23,7 +23,12 @@ export async function GET(
             return NextResponse.json({ error: 'Partner not found' }, { status: 404 });
         }
 
-        return NextResponse.json(partner);
+        // Return a shape that satisfies both setPartner(data) and setPartner(data.partner)
+        return NextResponse.json({
+            success: true,
+            partner,
+            ...partner
+        });
     } catch (error: any) {
         console.error('Error fetching partner profile:', error);
         return NextResponse.json(

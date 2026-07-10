@@ -72,6 +72,9 @@ export default function NotificationBell() {
         onClick={toggleOpen}
         style={{ width: 40, height: 40, background: open ? '#f0efe9' : '#f9f9f7', border: '1px solid #e2e0d8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', transition: 'background 0.15s' }}
         title="Notifications"
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         <Bell size={18} style={{ color: '#5a5650' }} />
         {unread > 0 && (

@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Flag, LayoutDashboard, ClipboardList, Tag, Trophy,
-  LogOut, CheckCircle, XCircle, Eye, Trash2, AlertTriangle, Users, Milestone,
+  LogOut, CheckCircle, XCircle, Eye, Trash2, AlertTriangle, Users, Milestone, Activity,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 
 type FlagStatus = 'pending' | 'resolved' | 'dismissed';
 
@@ -49,6 +50,8 @@ export default function AdminFlaggedPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [toast, setToast]     = useState<string | null>(null);
   const [preview, setPreview] = useState<FlagReport | null>(null);
+
+  useEscapeKey(preview !== null, () => setPreview(null));
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -197,8 +200,8 @@ export default function AdminFlaggedPage() {
 
       {/* Content preview modal */}
       {preview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
-          <div style={{ background: '#fff', padding: '36px', maxWidth: 560, width: '100%' }}>
+        <div onClick={() => setPreview(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 20 }}>
+          <div role="dialog" aria-modal="true" aria-label="Review flag report" onClick={e => e.stopPropagation()} style={{ background: '#fff', padding: '36px', maxWidth: 560, width: '100%' }}>
             <div style={{ fontSize: '11px', fontWeight: 800, color: '#c0392b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
               {preview.contentType} — {preview.reason}
             </div>
@@ -288,6 +291,11 @@ export default function AdminFlaggedPage() {
             onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
             <Milestone size={14} /> Roadmap Editor
           </Link>
+          <Link href="/admin/activity" style={navLinkBase}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
+            <Activity size={14} /> Activity Log
+          </Link>
         </div>
       </div>
 
@@ -334,9 +342,9 @@ export default function AdminFlaggedPage() {
               </div>
             </div>
           ) : (
-            <div>
+            <div style={{ overflowX: 'auto' }}>
               {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 130px 130px 130px 140px', gap: 0, padding: '12px 24px', background: '#f9f9f7', borderBottom: '1px solid #e2e0d8' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 130px 130px 130px 140px', gap: 0, padding: '12px 24px', background: '#f9f9f7', borderBottom: '1px solid #e2e0d8', minWidth: 760 }}>
                 {['Type', 'Content Preview', 'Author', 'Reported By', 'Reason', 'Actions'].map(h => (
                   <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{h}</div>
                 ))}
@@ -345,7 +353,7 @@ export default function AdminFlaggedPage() {
               {filtered.map(report => {
                 const s = statusStyles[report.status];
                 return (
-                  <div key={report.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 130px 130px 130px 140px', gap: 0, padding: '16px 24px', borderBottom: '1px solid #f0efe9', alignItems: 'center' }}>
+                  <div key={report.id} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 130px 130px 130px 140px', gap: 0, padding: '16px 24px', borderBottom: '1px solid #f0efe9', alignItems: 'center', minWidth: 760 }}>
                     {/* Type */}
                     <div>
                       <span style={{ padding: '3px 10px', background: report.contentType === 'post' ? 'rgba(231,182,5,0.1)' : '#f0efe9', color: report.contentType === 'post' ? '#9b7011' : '#5a5650', fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Milestone } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Milestone, Activity } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -182,6 +182,7 @@ export default function AdminAwardsPage() {
             { href: '/admin/flagged', icon: <Flag size={14} />, label: 'Flagged Content', active: false },
             { href: '/admin/users', icon: <Users size={14} />, label: 'Users', active: false },
             { href: '/admin/roadmap', icon: <Milestone size={14} />, label: 'Roadmap Editor', active: false },
+            { href: '/admin/activity', icon: <Activity size={14} />, label: 'Activity Log', active: false },
           ].map(item => (
             <Link
               key={item.href}

@@ -6,20 +6,21 @@ import {
   Settings, Calendar, Building2, Users, BookOpen, Trophy, Star,
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
-  UserCircle, Globe, MapPin, Rss, Sparkles
+  UserCircle, Globe, MapPin, Rss, Sparkles, Menu, X as CloseIcon,
 } from 'lucide-react';
 import FeedSection from './FeedSection';
 import RoadmapSection from './RoadmapSection';
 import StepCard from './StepCard';
 import NotificationBell from './NotificationBell';
 import { computeProfileCompletion } from './profile-completion';
+import { useEscapeKey } from '@/components/ui/useEscapeKey';
 import type { Nomination } from '@/app/awards/nominate/page';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile, getRoadmap, toggleStepCompletion } from '@/app/actions/profile';
 
-type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'business' | 'owners' | 'roadmap' | 'matches';
+type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners' | 'roadmap' | 'matches';
 
 const defaultMember = {
   name: 'Loading User',
@@ -53,6 +54,7 @@ const navItems: { icon: React.ElementType; label: string; section?: Section; hre
   { icon: Calendar, label: 'Events', section: 'events' },
   { icon: Tag, label: 'Offers', section: 'offers' },
   { icon: Trophy, label: 'Awards', section: 'awards' },
+  { icon: Building2, label: 'My Directory Profile', section: 'directoryProfile' },
   { icon: Building2, label: 'Business', section: 'business' },
   { icon: UserCircle, label: 'Owners', section: 'owners' },
   { icon: Users, label: 'My Matches', section: 'matches' },
@@ -94,6 +96,7 @@ const sectionTitles: Record<Section, string> = {
   events: 'My Events',
   offers: 'My Offers',
   awards: 'My Awards',
+  directoryProfile: 'My Directory Profile',
   business: 'Business Profiles',
   owners: 'Owner Network',
   matches: 'My Matches',
@@ -693,6 +696,16 @@ export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState<Section>('feed');
   const [member, setMember] = useState(defaultMember);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Track viewport so the fixed sidebar can go off-canvas on small screens.
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 900);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const isAdmin = userProfile?.role === 'ADMIN';
   const visibleNavItems = isAdmin
     ? [
@@ -758,6 +771,8 @@ export default function DashboardPage() {
     message: '',
     onConfirm: () => { },
   });
+
+  useEscapeKey(confirmModal.isOpen, () => setConfirmModal(prev => ({ ...prev, isOpen: false })));
 
   const loadProfile = async () => {
     const res = await getProfile();
@@ -1068,7 +1083,7 @@ export default function DashboardPage() {
     if (item.section) {
       return (
         <button
-          onClick={() => setActiveSection(item.section!)}
+          onClick={() => { setActiveSection(item.section!); setSidebarOpen(false); }}
           style={{ ...sharedStyle, background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
         >
           <item.icon size={16} />
@@ -1382,49 +1397,49 @@ export default function DashboardPage() {
           )}
         </div>
 
-          {nomTotalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
-              <button
-                disabled={nomPage === 1}
-                onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
-                  cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
-                }}
-              >
-                Prev
-              </button>
-              
-              {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setNomPage(pageNum)}
-                  style={{
-                    padding: '8px 14px', border: '1px solid',
-                    borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
-                    background: nomPage === pageNum ? '#e7b605' : '#fff',
-                    color: nomPage === pageNum ? '#fff' : '#2a2820',
-                    cursor: 'pointer', fontWeight: 700, fontSize: '12px'
-                  }}
-                >
-                  {pageNum}
-                </button>
-              ))}
+        {nomTotalPages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
+            <button
+              disabled={nomPage === 1}
+              onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
+                cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+              }}
+            >
+              Prev
+            </button>
 
+            {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
               <button
-                disabled={nomPage === nomTotalPages}
-                onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
+                key={pageNum}
+                onClick={() => setNomPage(pageNum)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
-                  cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+                  padding: '8px 14px', border: '1px solid',
+                  borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
+                  background: nomPage === pageNum ? '#e7b605' : '#fff',
+                  color: nomPage === pageNum ? '#fff' : '#2a2820',
+                  cursor: 'pointer', fontWeight: 700, fontSize: '12px'
                 }}
               >
-                Next
+                {pageNum}
               </button>
-            </div>
-          )}
+            ))}
+
+            <button
+              disabled={nomPage === nomTotalPages}
+              onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
+                cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        )}
 
 
         <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
@@ -1619,12 +1634,22 @@ export default function DashboardPage() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
 
+      {/* Mobile overlay */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55 }} />
+      )}
+
       {/* Sidebar */}
-      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50 }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a' }}>
+      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60, transform: (!isMobile || sidebarOpen) ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <Logo size="sm" />
           </Link>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, display: 'flex' }}>
+              <CloseIcon size={20} />
+            </button>
+          )}
         </div>
 
         {/* Member card */}
@@ -1678,14 +1703,21 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main style={{ marginLeft: 260, flex: 1 }}>
+      <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, minWidth: 0 }}>
         {/* Top bar */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40 }}>
-          <div>
-            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px' }}>
-              {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
-            </h1>
-            <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
+        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {isMobile && (
+              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
+                <Menu size={20} />
+              </button>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: isMobile ? '17px' : '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
+              </h1>
+              <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <NotificationBell />
@@ -1708,6 +1740,7 @@ export default function DashboardPage() {
         {activeSection === 'events' && <EventsSection />}
         {activeSection === 'offers' && <OffersSection />}
         {activeSection === 'awards' && <AwardsSection />}
+        {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} />}
         {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
         {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
         {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
@@ -1715,28 +1748,35 @@ export default function DashboardPage() {
 
       {/* Custom Confirmation Modal */}
       {confirmModal.isOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-        }}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e0d8',
-            padding: '32px',
-            maxWidth: '440px',
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+        <div
+          onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
           }}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={confirmModal.title}
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              border: '1px solid #e2e0d8',
+              padding: '32px',
+              maxWidth: '440px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            }}>
             <h3 style={{
               fontFamily: 'DM Sans, sans-serif',
               fontWeight: 800,

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// GET /api/partners — public list of active partners (with resource counts).
 export async function GET() {
     try {
-        const partnersList = await prisma.partners.findMany({
-            orderBy: {
-                name: 'asc',
-            },
+        const partners = await prisma.partners.findMany({
+            where: { status: 'ACTIVE' },
+            orderBy: [{ featured: 'desc' }, { name: 'asc' }],
             include: {
                 _count: {
                     select: {
@@ -16,7 +16,7 @@ export async function GET() {
             },
         });
 
-        return NextResponse.json(partnersList);
+        return NextResponse.json({ success: true, partners });
     } catch (error: any) {
         console.error('Error fetching partners:', error);
         return NextResponse.json(
@@ -26,6 +26,7 @@ export async function GET() {
     }
 }
 
+// POST /api/partners — create partner profile
 export async function POST(request: Request) {
     try {
         const body = await request.json();
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
 
         const newPartner = await prisma.partners.create({
             data: {
-                name,
+                name: name.trim(),
                 logo_url: logo_url || null,
                 short_desc: short_desc || null,
                 long_desc: long_desc || null,

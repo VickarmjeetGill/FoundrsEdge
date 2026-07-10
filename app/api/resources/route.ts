@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// GET /api/resources — public resources hub.
+// Optional filters: ?category=<type> ?partnerId=<uuid> ?featured=true ?type=<type> ?search=<term>
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
@@ -8,8 +10,9 @@ export async function GET(request: Request) {
         const category = searchParams.get('category');
         const type = searchParams.get('type');
         const search = searchParams.get('search');
+        const featured = searchParams.get('featured');
 
-        const where: any = {};
+        const where: any = { status: 'PUBLISHED' };
 
         if (partnerId) {
             where.partner_id = partnerId;
@@ -19,6 +22,9 @@ export async function GET(request: Request) {
         }
         if (type && type !== 'All Types') {
             where.type = type;
+        }
+        if (featured === 'true') {
+            where.featured = true;
         }
         if (search) {
             where.OR = [
@@ -32,17 +38,19 @@ export async function GET(request: Request) {
             include: {
                 partner: {
                     select: {
+                        id: true,
                         name: true,
                         logo_url: true,
                     },
                 },
             },
-            orderBy: {
-                created_at: 'desc',
-            },
+            orderBy: [
+                { featured: 'desc' },
+                { created_at: 'desc' }
+            ],
         });
 
-        return NextResponse.json(resources);
+        return NextResponse.json({ success: true, resources });
     } catch (error: any) {
         console.error('Error fetching resources:', error);
         return NextResponse.json(
@@ -52,6 +60,7 @@ export async function GET(request: Request) {
     }
 }
 
+// POST /api/resources — admin/public resource creation
 export async function POST(request: Request) {
     try {
         const body = await request.json();
