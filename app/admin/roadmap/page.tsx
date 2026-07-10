@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, ClipboardList, Tag, Trophy, Flag, Users, LogOut, 
-  Plus, Pencil, Trash2, ArrowUp, ArrowDown, RefreshCw, Milestone, ExternalLink
+  Plus, Pencil, Trash2, ArrowUp, ArrowDown, RefreshCw, Milestone, ExternalLink, Activity
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
+import AdminLayout from '@/components/AdminLayout';
 import { 
   getAdminRoadmapSteps, 
   createRoadmapStep, 
@@ -168,47 +169,8 @@ export default function AdminRoadmapPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9f9f7', fontFamily: 'DM Sans, sans-serif' }}>
-      {/* Top Bar */}
-      <div style={{ background: '#000', borderBottom: '1px solid #1a1a1a', padding: '0 32px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Link href="/" style={{ textDecoration: 'none' }}><Logo size="sm" /></Link>
-          <div style={{ width: 1, height: 24, background: '#2a2a2a' }} />
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Admin Panel</span>
-        </div>
-        <button onClick={async () => { await logout(); router.push('/login'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: '1px solid #2a2a2a', color: '#888', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 16px', cursor: 'pointer' }}>
-          <LogOut size={14} /> Sign Out
-        </button>
-      </div>
-
-      {/* Secondary Nav */}
-      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, overflowX: 'auto', whiteSpace: 'nowrap' }}>
-          <Link href="/admin/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <LayoutDashboard size={14} /> Content Manager
-          </Link>
-          <Link href="/admin/events" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <ClipboardList size={14} /> Review Events
-          </Link>
-          <Link href="/admin/offers" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <Tag size={14} /> Review Offers
-          </Link>
-          <Link href="/admin/awards" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <Trophy size={14} /> Review Awards
-          </Link>
-          <Link href="/admin/flagged" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <Flag size={14} /> Flagged Content
-          </Link>
-          <Link href="/admin/users" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#888', borderBottom: '2px solid transparent', transition: 'all 0.2s' }}>
-            <Users size={14} /> Users
-          </Link>
-          <Link href="/admin/roadmap" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none', color: '#e7b605', borderBottom: '2px solid #e7b605', transition: 'all 0.2s' }}>
-            <Milestone size={14} /> Roadmap Editor
-          </Link>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px' }}>
+    <AdminLayout activeTab="roadmap">
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px', width: '100%', boxSizing: 'border-box' }}>
         {/* Track Selection and Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <div>
@@ -586,6 +548,6 @@ export default function AdminRoadmapPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }

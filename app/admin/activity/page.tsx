@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Activity, LayoutDashboard, ClipboardList, Tag, Trophy, Flag, Users,
-  LogOut, Calendar, Award,
+  LogOut, Calendar, Award, Milestone,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
+import AdminLayout from '@/components/AdminLayout';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -100,48 +101,9 @@ export default function AdminActivityPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9f9f7', fontFamily: 'DM Sans, sans-serif' }}>
+    <AdminLayout activeTab="activity">
 
-      {/* Top Bar */}
-      <div style={{ background: '#000', borderBottom: '1px solid #1a1a1a', padding: '0 32px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Link href="/" style={{ textDecoration: 'none' }}><Logo size="sm" /></Link>
-          <div style={{ width: 1, height: 24, background: '#2a2a2a' }} />
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', color: '#888', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Admin Panel</span>
-        </div>
-        <button onClick={() => { localStorage.removeItem('fe_admin'); window.location.href = '/'; }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: '1px solid #2a2a2a', color: '#888', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 16px', cursor: 'pointer' }}>
-          <LogOut size={14} /> Sign Out
-        </button>
-      </div>
-
-      {/* Secondary Nav */}
-      <div style={{ background: '#0a0a0a', borderBottom: '1px solid #1a1a1a' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 40px', display: 'flex', gap: 0, flexWrap: 'wrap' }}>
-          <Link href="/admin/dashboard" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <LayoutDashboard size={14} /> Content Manager
-          </Link>
-          <Link href="/admin/events" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <ClipboardList size={14} /> Review Events
-          </Link>
-          <Link href="/admin/offers" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <Tag size={14} /> Review Offers
-          </Link>
-          <Link href="/admin/awards" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <Trophy size={14} /> Review Awards
-          </Link>
-          <Link href="/admin/flagged" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <Flag size={14} /> Flagged Content
-          </Link>
-          <Link href="/admin/users" style={navLinkBase} onMouseEnter={e => { e.currentTarget.style.color = '#ccc'; }} onMouseLeave={e => { e.currentTarget.style.color = '#888'; }}>
-            <Users size={14} /> Users
-          </Link>
-          <Link href="/admin/activity" style={{ ...navLinkBase, color: '#e7b605', borderBottom: '2px solid #e7b605' }}>
-            <Activity size={14} /> Activity Log
-          </Link>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Stats */}
         <div className="grid-4" style={{ gap: 2, marginBottom: 32 }}>
@@ -213,6 +175,6 @@ export default function AdminActivityPage() {
           )}
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }
