@@ -33,7 +33,7 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
           const mappedOffer: Offer = {
             id: o.id,
             businessName: o.business_name,
-            businessId: o.business_id,
+            businessId: o.business_directory_id,
             title: o.title,
             type: o.type,
             discount: o.type === 'percentage' ? `${o.discount_value}% off` : o.type === 'fixed' ? `$${o.discount_value} off` : o.type === 'bogo' ? 'Buy 1 Get 1 Free' : o.discount_value || o.fe_discount || 'Special Offer',

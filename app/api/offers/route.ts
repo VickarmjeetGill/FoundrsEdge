@@ -187,6 +187,7 @@ export async function GET(request: NextRequest) {
                     id: true,
                     title: true,
                     description: true,
+                    business_id: true,
                     business_name: true,
                     category: true,
                     type: true,
@@ -213,6 +214,7 @@ export async function GET(request: NextRequest) {
             prisma.offers.count({ where })
         ]);
 
+
         let stats = null;
         if (adminView) {
             const [totalCount, pendingCount, approvedCount, rejectedCount] = await Promise.all([
@@ -229,9 +231,14 @@ export async function GET(request: NextRequest) {
             };
         }
 
+               const offersWithBusinessDirectoryId = offers.map((offer) => ({
+            ...offer,
+            business_directory_id: offer.business_id,
+        }));
+
         if (isPaginated) {
             return NextResponse.json({
-                offers,
+                offers: offersWithBusinessDirectoryId,
                 stats,
                 pagination: {
                     total,
@@ -242,7 +249,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        return NextResponse.json(offers);
+        return NextResponse.json(offersWithBusinessDirectoryId);
 
     } catch (error: any) {
         console.error('Error fetching offers:', error);
