@@ -77,17 +77,40 @@ type MyOffer = {
   discount: string;
   category: string;
   type: string;
+  template?: string;
   expiryDate?: string;
   submittedAt: string;
   updatedAt?: string;
   status: 'pending' | 'approved' | 'rejected';
 };
+
+const offerTemplateLabels: Record<string, string> = {
+  percentage: 'Percentage Discount',
+  fixed: 'Fixed Amount Discount',
+  bogo: 'Buy One Get One',
+  custom: 'Custom Offer',
+  passport: 'Passport Offer',
+  event: 'Event Offer',
+  affiliate: 'Affiliate Offer',
+};
+
+
+
+
 const statusStyles: Record<'pending' | 'approved' | 'rejected' | 'archived', { bg: string; color: string; label: string }> = {
   pending: { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
   approved: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', label: 'Approved' },
   rejected: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Rejected' },
   archived: { bg: 'rgba(90,86,80,0.1)', color: '#5a5650', label: 'Archived' },
 };
+
+function formatOfferTemplate(template?: string) {
+  if (!template) return 'Standard Offer';
+
+  return template
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+}
 
 const sectionTitles: Record<Section, string> = {
   dashboard: 'Dashboard',
@@ -348,12 +371,12 @@ function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
         {recommendations.matches.map((match, idx) => (
-          <div 
-            key={idx} 
-            style={{ 
-              background: '#fff', 
-              border: '1px solid #e2e0d8', 
-              borderRadius: '8px', 
+          <div
+            key={idx}
+            style={{
+              background: '#fff',
+              border: '1px solid #e2e0d8',
+              borderRadius: '8px',
               padding: '24px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
               display: 'flex',
@@ -399,7 +422,7 @@ function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
               <span style={{ fontSize: '11px', color: '#9a9585', fontWeight: 600 }}>
                 {match.mutual} Mutual Connection{match.mutual !== 1 ? 's' : ''}
               </span>
-              <button 
+              <button
                 onClick={() => {
                   setConfirmModal({
                     isOpen: true,
@@ -741,7 +764,7 @@ export default function DashboardPage() {
 
   const handleToggleWidgetStep = async (stepId: string) => {
     const isCompleted = completedStepIds.includes(stepId);
-    
+
     // Optimistic update
     if (isCompleted) {
       setCompletedStepIds(prev => prev.filter(id => id !== stepId));
@@ -922,6 +945,7 @@ export default function DashboardPage() {
           discount: o.type === 'percentage' ? `${o.discount_value}% off` : o.type === 'fixed' ? `$${o.discount_value} off` : o.type === 'bogo' ? 'Buy 1 Get 1 Free' : o.discount_value || o.fe_discount || 'Special Offer',
           category: o.category,
           type: o.type,
+          template: o.passport_type || o.type || 'Standard Offer',
           expiryDate: o.expiry_date,
           submittedAt: o.created_at || o.created_At || new Date().toISOString(),
           status: o.status.toLowerCase() as any,
@@ -1258,8 +1282,44 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        flexShrink: 0,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span
+                        style={{
+                          background: '#f0efe9',
+                          color: '#5a5650',
+                          padding: '4px 12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Template:{' '}
+                        {offerTemplateLabels[offer.template ?? ''] ??
+                          formatOfferTemplate(offer.template)}
+                      </span>
+
+                      <span
+                        style={{
+                          background: s.bg,
+                          color: s.color,
+                          padding: '4px 12px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {s.label}
                       </span>
                       {canEdit && (
@@ -1538,7 +1598,7 @@ export default function DashboardPage() {
                 You've completed all items on your current track! Ready to keep growing?
               </p>
             </div>
-            <button 
+            <button
               onClick={() => setActiveSection('roadmap')}
               style={{
                 background: '#000',
