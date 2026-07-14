@@ -14,6 +14,113 @@ type UpdateDirectoryProfileBody = {
   openToMatching?: boolean;
 };
 
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+
+    const business = await prisma.businesses.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        member_id: true,
+        business_name: true,
+        business_desc: true,
+        website: true,
+        business_type: true,
+        geographic_focus: true,
+        ideal_client_industries: true,
+        referral_partner_industries: true,
+        priorities: true,
+        open_to_matching: true,
+        status: true,
+        featured: true,
+        removed: true,
+        created_at: true,
+        members: {
+          select: {
+            first_name: true,
+            last_name: true,
+            email: true,
+            phone: true,
+            linkedin: true,
+          },
+        },
+        offers: {
+          where: {
+            status: {
+              equals: 'approved',
+              mode: 'insensitive',
+            },
+            expiry_date: {
+              gt: new Date(),
+            },
+          },
+          select: {
+            id: true,
+            business_id: true,
+            business_name: true,
+            title: true,
+            description: true,
+            category: true,
+            type: true,
+            discount_value: true,
+            location: true,
+            expiry_date: true,
+            fe_discount: true,
+            events_page_url: true,
+            how_to_redeem: true,
+            promo_code: true,
+            featured: true,
+            status: true,
+            created_at: true,
+          },
+          orderBy: [
+            {
+              featured: 'desc',
+            },
+            {
+              created_at: 'desc',
+            },
+          ],
+        },
+      },
+    });
+
+    if (!business || business.removed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Business directory profile not found.',
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      business: {
+        ...business,
+        active_offer_count: business.offers.length,
+      },
+    });
+  } catch (error) {
+    console.error('Directory profile fetch error:', error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch the business directory profile.',
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
