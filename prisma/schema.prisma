@@ -26,12 +26,36 @@ model businesses {
   removed                     Boolean   @default(false)
   created_at                  DateTime? @default(now()) @db.Timestamptz(6)
 
-  members          members? @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  offers           offers[] @relation("OfferBusiness")
-  directory_offers offers[] @relation("OfferDirectoryProfile")
+  members           members?           @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  offers            offers[]           @relation("OfferBusiness")
+  directory_profile BusinessDirectory?
 
   @@index([member_id])
   @@index([business_name])
+}
+
+model BusinessDirectory {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id   String   @unique @db.Uuid
+  name          String
+  category      String?
+  description   String?
+  logo_url      String?
+  website       String?
+  location      String?
+  contact_email String?
+  is_featured   Boolean  @default(false)
+  status        String   @default("PENDING")
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+
+  business businesses @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  offers   offers[]
+
+  @@index([category])
+  @@index([status])
+  @@index([is_featured])
+  @@map("business_directory")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -132,9 +156,9 @@ model offers {
   passport_type   String?
   promo_code      String?
 
-  businesses         businesses? @relation("OfferBusiness", fields: [business_id], references: [id])
-  business_directory businesses? @relation("OfferDirectoryProfile", fields: [business_directory_id], references: [id], onDelete: SetNull)
-  members            members?    @relation(fields: [member_id], references: [id])
+  businesses         businesses?        @relation("OfferBusiness", fields: [business_id], references: [id])
+  business_directory BusinessDirectory? @relation(fields: [business_directory_id], references: [id], onDelete: SetNull)
+  members            members?           @relation(fields: [member_id], references: [id])
 
   @@index([member_id])
   @@index([business_id])
