@@ -136,25 +136,27 @@ model offers {
   business_id           String? @db.Uuid
   business_directory_id String? @db.Uuid
 
-  business_name   String
-  category        String
-  type            String
-  discount_value  String?
-  title           String
-  description     String
-  location        String?
-  expiry_date     DateTime
-  fe_discount     String?
-  events_page_url String?
-  how_to_redeem   String?
-  is_affiliate    Boolean  @default(false)
-  status          String   @default("PENDING")
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @updatedAt @db.Timestamptz(6)
-  featured        Boolean  @default(false)
-  is_passport     Boolean  @default(false)
-  passport_type   String?
-  promo_code      String?
+  business_name     String
+  category          String
+  type              String
+  discount_value    String?
+  discount_template String?
+  discount_category String?
+  title             String
+  description       String
+  location          String?
+  expiry_date       DateTime
+  fe_discount       String?
+  events_page_url   String?
+  how_to_redeem     String?
+  is_affiliate      Boolean  @default(false)
+  status            String   @default("PENDING")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  featured          Boolean  @default(false)
+  is_passport       Boolean  @default(false)
+  passport_type     String?
+  promo_code        String?
 
   businesses         businesses?        @relation("OfferBusiness", fields: [business_id], references: [id])
   business_directory BusinessDirectory? @relation(fields: [business_directory_id], references: [id], onDelete: SetNull)

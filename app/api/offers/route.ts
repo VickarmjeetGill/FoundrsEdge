@@ -33,6 +33,14 @@ export class CreateOfferDto {
 
     @IsOptional()
     @IsString()
+    discountTemplate?: string;
+
+    @IsOptional()
+    @IsString()
+    discountCategory?: string;
+
+    @IsOptional()
+    @IsString()
     discountUnit?: string;
 
     @IsOptional()
@@ -219,6 +227,8 @@ export async function GET(request: NextRequest) {
                     category: true,
                     type: true,
                     discount_value: true,
+                    discount_template: true,
+                    discount_category: true,
                     status: true,
                     expiry_date: true,
                     featured: true,
@@ -242,11 +252,11 @@ export async function GET(request: NextRequest) {
         ]);
 
 
-const offersWithTemplateLabels = offers.map((offer) => ({
-    ...offer,
-    template_label: getOfferTemplateLabel(offer),
-}));
-        
+        const offersWithTemplateLabels = offers.map((offer) => ({
+            ...offer,
+            template_label: getOfferTemplateLabel(offer),
+        }));
+
 
         let stats = null;
         if (adminView) {
@@ -264,7 +274,7 @@ const offersWithTemplateLabels = offers.map((offer) => ({
             };
         }
 
-               const offersWithBusinessDirectoryId = offers.map((offer) => ({
+        const offersWithBusinessDirectoryId = offers.map((offer) => ({
             ...offer,
             business_directory_id: offer.business_id,
         }));
@@ -282,7 +292,7 @@ const offersWithTemplateLabels = offers.map((offer) => ({
             });
         }
 
-       return NextResponse.json(offersWithTemplateLabels);
+        return NextResponse.json(offersWithTemplateLabels);
 
     } catch (error: any) {
         console.error('Error fetching offers:', error);
@@ -355,6 +365,8 @@ export async function POST(request: Request) {
                 category: data.category,
                 type: data.type,
                 discount_value: data.discountValue || null,
+                discount_template: data.discountTemplate || null,
+                discount_category: data.discountCategory || null,
                 title: data.title,
                 description: data.description,
                 location: data.location || null,

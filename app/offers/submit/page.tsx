@@ -398,7 +398,11 @@ function OfferSubmitContent() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        discountTemplate: form.type,
+        discountCategory: form.category,
+      }),
     });
 
     if (response.ok) {
