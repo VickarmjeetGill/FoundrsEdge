@@ -68,6 +68,33 @@ export class CreateOfferDto {
     agreeGuidelines?: boolean;
 }
 
+function getOfferTemplateLabel(offer: {
+    type: string;
+    is_passport?: boolean | null;
+    passport_type?: string | null;
+}) {
+    if (offer.passport_type) {
+        return offer.passport_type
+            .replace(/[_-]/g, ' ')
+            .replace(/\b\w/g, letter => letter.toUpperCase());
+    }
+
+    if (offer.is_passport) {
+        return 'Passport Offer';
+    }
+
+    const templateLabels: Record<string, string> = {
+        percentage: 'Percentage Discount',
+        fixed: 'Fixed Amount Discount',
+        bogo: 'Buy One Get One',
+        custom: 'Custom Offer',
+        event: 'Event Offer',
+        affiliate: 'Affiliate Offer',
+    };
+
+    return templateLabels[offer.type?.toLowerCase()] || 'Standard Offer';
+}
+
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -215,6 +242,12 @@ export async function GET(request: NextRequest) {
         ]);
 
 
+const offersWithTemplateLabels = offers.map((offer) => ({
+    ...offer,
+    template_label: getOfferTemplateLabel(offer),
+}));
+        
+
         let stats = null;
         if (adminView) {
             const [totalCount, pendingCount, approvedCount, rejectedCount] = await Promise.all([
@@ -238,7 +271,7 @@ export async function GET(request: NextRequest) {
 
         if (isPaginated) {
             return NextResponse.json({
-                offers: offersWithBusinessDirectoryId,
+                offers: offersWithTemplateLabels,
                 stats,
                 pagination: {
                     total,
@@ -249,7 +282,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        return NextResponse.json(offersWithBusinessDirectoryId);
+       return NextResponse.json(offersWithTemplateLabels);
 
     } catch (error: any) {
         console.error('Error fetching offers:', error);
