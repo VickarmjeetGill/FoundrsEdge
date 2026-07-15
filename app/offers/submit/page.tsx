@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { CheckCircle, ArrowLeft, AlertCircle, Percent, Gift, Tag, Zap } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import type { Offer } from '../page';
+import {
+  categoryDiscountPresets,
+  type DiscountPreset,
+} from '@/lib/offers/discount-templates';
+
 
 type OfferType = 'percentage' | 'bogo' | 'fixed' | 'custom';
 
@@ -58,175 +63,9 @@ const offerCategories = [
   'Other',
 ];
 
-type DiscountPreset = {
-  value: string;
-  label: string;
-  description: string;
-};
 
-const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
-  'Professional Services': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'A simple introductory member discount.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'A strong incentive for first-time clients.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'Best for consultations or service packages.',
-    },
-  ],
 
-  'Marketing & Design': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for smaller creative services.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Ideal for projects and design packages.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'A high-value member-exclusive promotion.',
-    },
-  ],
 
-  Technology: [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for subscriptions and setup fees.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Useful for onboarding or implementation.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'Best for annual plans or larger packages.',
-    },
-  ],
-
-  'Finance & Legal': [
-    {
-      value: '5',
-      label: '5% Off',
-      description: 'A modest discount for professional services.',
-    },
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for consultations and reviews.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Best for larger service packages.',
-    },
-  ],
-
-  'Health & Wellness': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for individual appointments.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Ideal for treatments or wellness services.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'Best for packages or first-time clients.',
-    },
-  ],
-
-  'Events & Venues': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for bookings and event services.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Ideal for venue or package discounts.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'A strong incentive for larger bookings.',
-    },
-  ],
-
-  'Retail & Products': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'A familiar and easy-to-understand discount.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Recommended for member purchases.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'Best for promotions or selected products.',
-    },
-  ],
-
-  'Food & Beverage': [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'Recommended for meals and regular purchases.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'Ideal for catering or larger orders.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'A strong member-exclusive promotion.',
-    },
-  ],
-
-  Other: [
-    {
-      value: '10',
-      label: '10% Off',
-      description: 'A safe and simple recommended discount.',
-    },
-    {
-      value: '15',
-      label: '15% Off',
-      description: 'A balanced member-exclusive incentive.',
-    },
-    {
-      value: '20',
-      label: '20% Off',
-      description: 'A high-value promotional option.',
-    },
-  ],
-};
 
 const typeOptions: {
   value: OfferType;
