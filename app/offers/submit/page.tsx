@@ -32,7 +32,7 @@ const initialForm: FormData = {
   businessName: '',
   title: '',
   type: 'percentage',
-  discountValue: '',
+  discountValue: '10',
   discountUnit: '% off',
   customDiscount: '',
   description: '',
@@ -58,12 +58,39 @@ const offerCategories = [
   'Other',
 ];
 
-const typeOptions: { value: OfferType; label: string; icon: React.ReactNode; hint: string; example: string }[] = [
-  { value: 'percentage', icon: <Percent size={18} />, label: 'Percentage Off', hint: 'e.g. 10% off your first consultation', example: '10% off' },
-  { value: 'bogo', icon: <Gift size={18} />, label: 'Buy One Get One', hint: 'e.g. Buy one session, get one free', example: 'Buy 1 Get 1' },
-  { value: 'fixed', icon: <Tag size={18} />, label: 'Fixed Amount Off', hint: 'e.g. $50 off your first order', example: '$50 off' },
-  { value: 'custom', icon: <Zap size={18} />, label: 'Custom Offer', hint: 'Write your own offer headline', example: 'Free audit' },
-];
+const typeOptions: {
+  value: OfferType;
+  label: string;
+  icon: React.ReactNode;
+  hint: string;
+  example: string;
+  popular: boolean;
+}[] = [
+    {
+      value: 'bogo',
+      icon: <Gift size={18} />,
+      label: 'Buy One Get One',
+      hint: 'e.g. Buy one session, get one free',
+      example: 'Buy 1 Get 1',
+      popular: false,
+    },
+    {
+      value: 'fixed',
+      icon: <Tag size={18} />,
+      label: 'Fixed Amount Off',
+      hint: 'e.g. $50 off your first order',
+      example: '$50 off',
+      popular: false,
+    },
+    {
+      value: 'custom',
+      icon: <Zap size={18} />,
+      label: 'Custom Offer',
+      hint: 'Write your own offer headline',
+      example: 'Free audit',
+      popular: false,
+    },
+  ];
 
 function buildDiscount(form: FormData): string {
   if (form.type === 'percentage') return `${form.discountValue}% off`;
@@ -335,9 +362,68 @@ function OfferSubmitContent() {
                       transition: 'all 0.2s',
                     }}
                   >
-                    <div style={{ color: form.type === opt.value ? '#9b7011' : '#9a9585', marginBottom: 8 }}>{opt.icon}</div>
-                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '14px', color: '#2a2820', marginBottom: 4 }}>{opt.label}</div>
-                    <div style={{ fontFamily: 'Noto Serif, serif', color: '#9a9585', fontSize: '12px', lineHeight: 1.5 }}>{opt.hint}</div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: form.type === opt.value ? '#9b7011' : '#9a9585',
+                        }}
+                      >
+                        {opt.icon}
+                      </div>
+
+                      {opt.popular && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '3px 8px',
+                            background: '#e7b605',
+                            color: '#000',
+                            borderRadius: 999,
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          ★ Most Popular
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        color: '#2a2820',
+                        marginBottom: 4,
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#9a9585',
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {opt.hint}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -369,6 +455,7 @@ function OfferSubmitContent() {
                       marginBottom: 4,
                     }}
                   >
+
                     Not sure which offer type to choose?
                   </div>
 
