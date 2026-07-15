@@ -156,6 +156,22 @@ function OfferSubmitContent() {
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
   }
 
+  function useRecommendedDefault() {
+    setForm(prev => ({
+      ...prev,
+      type: 'percentage',
+      discountValue: '10',
+      discountUnit: '% off',
+      customDiscount: '',
+    }));
+
+    setErrors(prev => ({
+      ...prev,
+      discountValue: undefined,
+      customDiscount: undefined,
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateForm(form);
@@ -327,6 +343,79 @@ function OfferSubmitContent() {
               </div>
 
               {/* Discount value input */}
+
+              {/* Recommended default fallback */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 16,
+                  flexWrap: 'wrap',
+                  padding: '16px 18px',
+                  marginBottom: 24,
+                  background: 'rgba(231,182,5,0.06)',
+                  border: '1px solid rgba(231,182,5,0.3)',
+                  borderLeft: '4px solid #e7b605',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      color: '#2a2820',
+                      marginBottom: 4,
+                    }}
+                  >
+                    Not sure which offer type to choose?
+                  </div>
+
+                  <div
+                    style={{
+                      fontFamily: 'Noto Serif, serif',
+                      color: '#5a5650',
+                      fontSize: '13px',
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Use our recommended default: a simple 10% member discount.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={useRecommendedDefault}
+                  disabled={atLimit}
+                  style={{
+                    flexShrink: 0,
+                    padding: '9px 16px',
+                    border: '1px solid #e7b605',
+                    background: '#fff',
+                    color: '#9b7011',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '12px',
+                    cursor: atLimit ? 'not-allowed' : 'pointer',
+                    opacity: atLimit ? 0.5 : 1,
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => {
+                    if (!atLimit) {
+                      e.currentTarget.style.background = '#e7b605';
+                      e.currentTarget.style.color = '#000';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '#fff';
+                    e.currentTarget.style.color = '#9b7011';
+                  }}
+                >
+                  Use Recommended Default
+                </button>
+              </div>
+
               {(form.type === 'percentage' || form.type === 'fixed') && (
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
