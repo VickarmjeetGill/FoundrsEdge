@@ -503,31 +503,103 @@ function OfferSubmitContent() {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
-            {/* ── Section 1: Business ── */}
-            <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '36px', marginBottom: 2 }}>
-              <div className="section-label" style={{ marginBottom: 24 }}>1. Your Business</div>
+            {/* ── Section 1: Business Category ── */}
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #e2e0d8',
+                padding: '36px',
+                marginBottom: 2,
+              }}
+            >
+              <div
+                className="section-label"
+                style={{ marginBottom: 24 }}
+              >
+                1. Business Category
+              </div>
 
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                    color: '#2a2820',
+                  }}
+                >
+                  Select Your Business Category *
+                </label>
+
+                <select
+                  className="select-field"
+                  value={form.category}
+                  onChange={e => handleChange('category', e.target.value)}
+                  disabled={atLimit}
+                  style={{ margin: 0 }}
+                >
+                  {offerCategories.map(category => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#9a9585',
+                    marginTop: 7,
+                    fontFamily: 'Noto Serif, serif',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Choose the category that best matches your business. Your recommended
+                  discount presets will update based on this selection.
+                </div>
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                    color: '#2a2820',
+                  }}
+                >
                   Business Name *
                 </label>
+
                 <input
                   className="input-field"
                   value={form.businessName}
                   onChange={e => handleChange('businessName', e.target.value)}
                   placeholder="Your business or company name"
                   disabled={atLimit}
+                  style={{ margin: 0 }}
                 />
-                {errors.businessName && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif' }}>{errors.businessName}</div>}
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
-                  Category *
-                </label>
-                <select className="select-field" value={form.category} onChange={e => handleChange('category', e.target.value)} disabled={atLimit}>
-                  {offerCategories.map(c => <option key={c}>{c}</option>)}
-                </select>
+                {errors.businessName && (
+                  <div
+                    style={{
+                      color: '#c0392b',
+                      fontSize: '12px',
+                      marginTop: 6,
+                      fontFamily: 'DM Sans, sans-serif',
+                    }}
+                  >
+                    {errors.businessName}
+                  </div>
+                )}
               </div>
             </div>
 
