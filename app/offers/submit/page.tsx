@@ -58,6 +58,176 @@ const offerCategories = [
   'Other',
 ];
 
+type DiscountPreset = {
+  value: string;
+  label: string;
+  description: string;
+};
+
+const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
+  'Professional Services': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'A simple introductory member discount.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'A strong incentive for first-time clients.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'Best for consultations or service packages.',
+    },
+  ],
+
+  'Marketing & Design': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for smaller creative services.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Ideal for projects and design packages.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'A high-value member-exclusive promotion.',
+    },
+  ],
+
+  Technology: [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for subscriptions and setup fees.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Useful for onboarding or implementation.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'Best for annual plans or larger packages.',
+    },
+  ],
+
+  'Finance & Legal': [
+    {
+      value: '5',
+      label: '5% Off',
+      description: 'A modest discount for professional services.',
+    },
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for consultations and reviews.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Best for larger service packages.',
+    },
+  ],
+
+  'Health & Wellness': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for individual appointments.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Ideal for treatments or wellness services.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'Best for packages or first-time clients.',
+    },
+  ],
+
+  'Events & Venues': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for bookings and event services.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Ideal for venue or package discounts.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'A strong incentive for larger bookings.',
+    },
+  ],
+
+  'Retail & Products': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'A familiar and easy-to-understand discount.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Recommended for member purchases.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'Best for promotions or selected products.',
+    },
+  ],
+
+  'Food & Beverage': [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'Recommended for meals and regular purchases.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'Ideal for catering or larger orders.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'A strong member-exclusive promotion.',
+    },
+  ],
+
+  Other: [
+    {
+      value: '10',
+      label: '10% Off',
+      description: 'A safe and simple recommended discount.',
+    },
+    {
+      value: '15',
+      label: '15% Off',
+      description: 'A balanced member-exclusive incentive.',
+    },
+    {
+      value: '20',
+      label: '20% Off',
+      description: 'A high-value promotional option.',
+    },
+  ],
+};
+
 const typeOptions: {
   value: OfferType;
   label: string;
@@ -192,6 +362,22 @@ function OfferSubmitContent() {
       customDiscount: '',
     }));
 
+    function selectDiscountPreset(value: string) {
+      setForm(prev => ({
+        ...prev,
+        type: 'percentage',
+        discountValue: value,
+        discountUnit: '% off',
+        customDiscount: '',
+      }));
+
+      setErrors(prev => ({
+        ...prev,
+        discountValue: undefined,
+        customDiscount: undefined,
+      }));
+    }
+
     setErrors(prev => ({
       ...prev,
       discountValue: undefined,
@@ -255,6 +441,10 @@ function OfferSubmitContent() {
 
   const MAX_OFFERS = 3;
   const atLimit = !isEditing && offerCount >= MAX_OFFERS;
+
+  const currentDiscountPresets =
+    categoryDiscountPresets[form.category] ??
+    categoryDiscountPresets.Other;
 
   // ── Form ────────────────────────────────────────────────────────
   return (
@@ -501,6 +691,139 @@ function OfferSubmitContent() {
                 >
                   Use Recommended Default
                 </button>
+              </div>
+
+              {/* Category-based discount presets */}
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        color: '#2a2820',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Recommended Discounts
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#9a9585',
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Suggested options for {form.category}.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {currentDiscountPresets.map(preset => {
+                    const isSelected =
+                      form.type === 'percentage' &&
+                      form.discountValue === preset.value;
+
+                    return (
+                      <label
+                        key={`${form.category}-${preset.value}`}
+                        style={{
+                          position: 'relative',
+                          display: 'block',
+                          padding: '20px',
+                          border: '2px solid',
+                          borderColor: isSelected ? '#e7b605' : '#e2e0d8',
+                          background: isSelected
+                            ? 'rgba(231,182,5,0.07)'
+                            : '#fff',
+                          cursor: atLimit ? 'not-allowed' : 'pointer',
+                          opacity: atLimit ? 0.5 : 1,
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="recommendedDiscount"
+                          value={preset.value}
+                          checked={isSelected}
+                          disabled={atLimit}
+                          onChange={() => selectDiscountPreset(preset.value)}
+                          style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            width: 17,
+                            height: 17,
+                            accentColor: '#e7b605',
+                            cursor: atLimit ? 'not-allowed' : 'pointer',
+                          }}
+                        />
+
+                        <div
+                          style={{
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontWeight: 900,
+                            fontSize: '28px',
+                            lineHeight: 1,
+                            color: isSelected ? '#9b7011' : '#2a2820',
+                            marginBottom: 10,
+                            paddingRight: 24,
+                          }}
+                        >
+                          {preset.label}
+                        </div>
+
+                        <div
+                          style={{
+                            fontFamily: 'Noto Serif, serif',
+                            color: '#9a9585',
+                            fontSize: '12px',
+                            lineHeight: 1.55,
+                          }}
+                        >
+                          {preset.description}
+                        </div>
+
+                        {isSelected && (
+                          <div
+                            style={{
+                              marginTop: 12,
+                              fontFamily: 'DM Sans, sans-serif',
+                              color: '#9b7011',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              letterSpacing: '0.07em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Selected
+                          </div>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               {(form.type === 'percentage' || form.type === 'fixed') && (
