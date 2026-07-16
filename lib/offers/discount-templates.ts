@@ -11,7 +11,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'A simple introductory member discount.',
-      recommended: true,
     },
     {
       value: '15',
@@ -22,6 +21,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'Best for consultations or service packages.',
+      recommended: true,
     },
   ],
 
@@ -30,7 +30,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for smaller creative services.',
-      recommended: true,
     },
     {
       value: '15',
@@ -49,7 +48,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for subscriptions and setup fees.',
-      recommended: true,
     },
     {
       value: '15',
@@ -60,6 +58,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'Best for annual plans or larger packages.',
+      recommended: true,
     },
   ],
 
@@ -73,7 +72,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for consultations and reviews.',
-      recommended: true,
     },
     {
       value: '15',
@@ -87,7 +85,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for individual appointments.',
-      recommended: true,
     },
     {
       value: '15',
@@ -98,6 +95,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'Best for packages or first-time clients.',
+      recommended: true,
     },
   ],
 
@@ -106,7 +104,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for bookings and event services.',
-      recommended: true,
     },
     {
       value: '15',
@@ -117,6 +114,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'A strong incentive for larger bookings.',
+      recommended: true,
     },
   ],
 
@@ -125,7 +123,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'A familiar and easy-to-understand discount.',
-      recommended: true,
     },
     {
       value: '15',
@@ -136,6 +133,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'Best for promotions or selected products.',
+      recommended: true,
     },
   ],
 
@@ -144,7 +142,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'Recommended for meals and regular purchases.',
-      recommended: true,
     },
     {
       value: '15',
@@ -155,6 +152,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'A strong member-exclusive promotion.',
+      recommended: true,
     },
   ],
 
@@ -163,7 +161,6 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '10',
       label: '10% Off',
       description: 'A safe and simple recommended discount.',
-      recommended: true,
     },
     {
       value: '15',
@@ -174,6 +171,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
       value: '20',
       label: '20% Off',
       description: 'A high-value promotional option.',
+      recommended: true,
     },
   ],
 };
