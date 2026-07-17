@@ -10,24 +10,29 @@ export type DiscountPreset = {
 export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
     'Professional Services': [
         {
-            value: '10',
-            label: '10% Off',
-            description: 'A simple introductory member discount.',
-            offerType: 'percentage',
-        },
-        {
-            value: '15',
-            label: '15% Off',
-            description: 'A strong incentive for first-time clients.',
-            offerType: 'percentage',
-        },
-
-        {
             value: '20',
-            label: '20% Off',
-            description: 'Best for consultations or service packages.',
-            recommended: true,
+            label: '20% Off First Service',
+            description:
+                'Give Founders Edge members 20% off their first eligible professional service.',
             offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'free-consultation',
+            label: 'Free Consultation',
+            description:
+                'Offer members one complimentary introductory consultation.',
+            offerType: 'custom',
+            customDiscount: 'Free consultation',
+        },
+        
+        {
+            value: 'free-strategy-session',
+            label: 'Free Strategy Session',
+            description:
+                'Provide members with one complimentary strategy session.',
+            offerType: 'custom',
+            customDiscount: 'Free strategy session',
         },
     ],
 
