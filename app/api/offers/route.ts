@@ -4,7 +4,15 @@ import { getCurrentUser } from '@/lib/session';
 import { invalidateCache } from '@/lib/redis';
 import { rateLimit } from '@/lib/rate-limiter';
 import { validateBody } from '@/lib/validate';
-import { IsString, IsNotEmpty, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+import {
+    IsBoolean,
+    IsDateString,
+    IsIn,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+} from 'class-validator';
+
 
 export class CreateOfferDto {
     @IsString()
@@ -35,8 +43,22 @@ export class CreateOfferDto {
     @IsString()
     discountTemplate?: string;
 
+
+
     @IsOptional()
-    @IsString()
+    @IsIn(
+        [
+            'restaurant',
+            'retail',
+            'professional_services',
+            'golf',
+            'other',
+        ],
+        {
+            message:
+                'Discount category must be restaurant, retail, professional_services, golf, or other',
+        }
+    )
     discountCategory?: string;
 
     @IsOptional()
