@@ -174,23 +174,28 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
 
     'Food & Beverage': [
         {
-            value: '10',
-            label: '10% Off',
-            description: 'Recommended for meals and regular purchases.',
-            offerType: 'percentage',
-        },
-        {
-            value: '15',
-            label: '15% Off',
-            description: 'Ideal for catering or larger orders.',
-            offerType: 'percentage',
-        },
-        {
             value: '20',
             label: '20% Off',
-            description: 'A strong member-exclusive promotion.',
-            recommended: true,
+            description:
+                'Give Founders Edge members 20% off eligible restaurant purchases.',
             offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'bogo-50',
+            label: 'Buy One, Get the Second 50% Off',
+            description:
+                'Members purchase one eligible item and receive the second item at 50% off.',
+            offerType: 'custom',
+            customDiscount: 'Buy one, get the second 50% off',
+        },
+        {
+            value: 'free-appetizer',
+            label: 'Free Appetizer',
+            description:
+                'Offer members one complimentary appetizer with an eligible purchase.',
+            offerType: 'custom',
+            customDiscount: 'Free appetizer with purchase',
         },
     ],
 
@@ -220,31 +225,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
         },
     ],
 
-    Golf: [
-        {
-            value: '20',
-            label: '20% Off Green Fees',
-            description:
-                'Give Founders Edge members 20% off eligible green-fee bookings.',
-            offerType: 'percentage',
-            recommended: true,
-        },
-        {
-            value: 'bogo-round',
-            label: 'BOGO Round',
-            description:
-                'Members purchase one eligible round and receive a second round free.',
-            offerType: 'bogo',
-        },
-        {
-            value: 'free-bucket-of-balls',
-            label: 'Free Bucket of Balls',
-            description:
-                'Offer members one complimentary bucket of practice balls.',
-            offerType: 'custom',
-            customDiscount: 'Free bucket of balls',
-        },
-    ],
+
 
     Other: [
         {
