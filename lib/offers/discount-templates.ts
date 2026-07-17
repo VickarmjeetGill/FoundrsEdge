@@ -25,7 +25,7 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
             offerType: 'custom',
             customDiscount: 'Free consultation',
         },
-        
+
         {
             value: 'free-strategy-session',
             label: 'Free Strategy Session',
@@ -147,23 +147,28 @@ export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
 
     'Retail & Products': [
         {
-            value: '10',
-            label: '10% Off',
-            description: 'A familiar and easy-to-understand discount.',
-            offerType: 'percentage',
-        },
-        {
-            value: '15',
-            label: '15% Off',
-            description: 'Recommended for member purchases.',
-            offerType: 'percentage',
-        },
-        {
             value: '20',
             label: '20% Off',
-            description: 'Best for promotions or selected products.',
+            description:
+                'Give Founders Edge members 20% off eligible retail products or purchases.',
             offerType: 'percentage',
             recommended: true,
+        },
+        {
+            value: 'spend-100-get-20',
+            label: 'Spend $100, Get $20 Off',
+            description:
+                'Members receive $20 off when they spend at least $100 on eligible products.',
+            offerType: 'custom',
+            customDiscount: 'Spend $100, get $20 off',
+        },
+        {
+            value: 'free-gift',
+            label: 'Free Gift',
+            description:
+                'Include a complimentary gift with an eligible member purchase.',
+            offerType: 'custom',
+            customDiscount: 'Free gift with purchase',
         },
     ],
 
