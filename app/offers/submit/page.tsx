@@ -60,6 +60,7 @@ const offerCategories = [
   'Events & Venues',
   'Retail & Products',
   'Food & Beverage',
+  'Golf',
   'Other',
 ];
 
@@ -208,6 +209,31 @@ function OfferSubmitContent() {
         discountValue: value,
         discountUnit: '% off',
         customDiscount: '',
+      }));
+
+      setErrors(prev => ({
+        ...prev,
+        discountValue: undefined,
+        customDiscount: undefined,
+      }));
+    }
+
+
+    function selectDiscountPreset(preset: DiscountPreset) {
+      setForm(prev => ({
+        ...prev,
+        type: preset.offerType,
+        discountValue:
+          preset.offerType === 'percentage' ||
+            preset.offerType === 'fixed'
+            ? preset.value
+            : '',
+        discountUnit:
+          preset.offerType === 'percentage' ? '% off' : prev.discountUnit,
+        customDiscount:
+          preset.offerType === 'custom'
+            ? preset.customDiscount || preset.label
+            : '',
       }));
 
       setErrors(prev => ({
