@@ -11,7 +11,9 @@ import {
 } from '@/lib/offers/discount-templates';
 
 
+
 type OfferType = 'percentage' | 'bogo' | 'fixed' | 'custom';
+
 
 type FormData = {
   businessName: string;
@@ -135,6 +137,21 @@ function OfferSubmitContent() {
   const [submitted, setSubmitted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [offerCount, setOfferCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const recommendationStreak = 3;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // Pre-fill form when editing and load offer count
   useEffect(() => {
@@ -187,6 +204,19 @@ function OfferSubmitContent() {
     }
     loadFormContext();
   }, [editId]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   function handleChange(field: keyof FormData, value: string | boolean) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -249,6 +279,108 @@ function OfferSubmitContent() {
       customDiscount: undefined,
     }));
   }
+
+  function renderRecommendationCard() {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: isMobile ? 12 : 16,
+          padding: isMobile ? '14px' : '16px 18px',
+          marginBottom: isMobile ? 16 : 24,
+          background: 'rgba(231,182,5,0.06)',
+          border: '1px solid rgba(231,182,5,0.3)',
+          borderLeft: '4px solid #e7b605',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: 800,
+              fontSize: isMobile ? '13px' : '14px',
+              color: '#2a2820',
+              marginBottom: 4,
+            }}
+          >
+            Not sure which offer type to choose?
+          </div>
+
+          <div
+            style={{
+              fontFamily: 'Noto Serif, serif',
+              color: '#5a5650',
+              fontSize: isMobile ? '12px' : '13px',
+              lineHeight: 1.5,
+            }}
+          >
+            Use our recommended default: a simple 10% member discount.
+          </div>
+        </div>
+
+<div
+  style={{
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    padding: '6px 10px',
+    background: 'rgba(231,182,5,0.12)',
+    border: '1px solid rgba(231,182,5,0.3)',
+    borderRadius: 999,
+    fontFamily: 'DM Sans, sans-serif',
+    fontSize: isMobile ? '11px' : '12px',
+    fontWeight: 700,
+    color: '#7a580d',
+    lineHeight: 1.4,
+  }}
+>
+  <span aria-hidden="true">🔥</span>
+  <span>
+    You have acted on your recommendation {recommendationStreak} weeks in a row
+  </span>
+</div>
+
+        <button
+          type="button"
+          onClick={useRecommendedDefault}
+          disabled={atLimit}
+          style={{
+            width: isMobile ? '100%' : 'auto',
+            flexShrink: 0,
+            padding: '10px 16px',
+            border: '1px solid #e7b605',
+            background: '#fff',
+            color: '#9b7011',
+            fontFamily: 'DM Sans, sans-serif',
+            fontWeight: 800,
+            fontSize: '12px',
+            cursor: atLimit ? 'not-allowed' : 'pointer',
+            opacity: atLimit ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={event => {
+            if (!atLimit) {
+              event.currentTarget.style.background = '#e7b605';
+              event.currentTarget.style.color = '#000';
+            }
+          }}
+          onMouseLeave={event => {
+            event.currentTarget.style.background = '#fff';
+            event.currentTarget.style.color = '#9b7011';
+          }}
+        >
+          Use Recommended Default
+        </button>
+      </div>
+    );
+  }
+
+  function renderRecommendationCard()
+  
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -318,6 +450,18 @@ function OfferSubmitContent() {
   // ── Form ────────────────────────────────────────────────────────
   return (
     <PageLayout>
+      {/* Mobile recommendation card - first page content */}
+      {isMobile && (
+        <div
+          style={{
+            background: '#f9f9f7',
+            padding: '12px 16px 0',
+          }}
+        >
+          {renderRecommendationCard()}
+        </div>
+      )}
+
       {/* Hero */}
       <div className="page-hero">
         <div className="container">
@@ -561,78 +705,8 @@ function OfferSubmitContent() {
 
               {/* Discount value input */}
 
-              {/* Recommended default fallback */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 16,
-                  flexWrap: 'wrap',
-                  padding: '16px 18px',
-                  marginBottom: 24,
-                  background: 'rgba(231,182,5,0.06)',
-                  border: '1px solid rgba(231,182,5,0.3)',
-                  borderLeft: '4px solid #e7b605',
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 800,
-                      fontSize: '14px',
-                      color: '#2a2820',
-                      marginBottom: 4,
-                    }}
-                  >
-
-                    Not sure which offer type to choose?
-                  </div>
-
-                  <div
-                    style={{
-                      fontFamily: 'Noto Serif, serif',
-                      color: '#5a5650',
-                      fontSize: '13px',
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    Use our recommended default: a simple 10% member discount.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={useRecommendedDefault}
-                  disabled={atLimit}
-                  style={{
-                    flexShrink: 0,
-                    padding: '9px 16px',
-                    border: '1px solid #e7b605',
-                    background: '#fff',
-                    color: '#9b7011',
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '12px',
-                    cursor: atLimit ? 'not-allowed' : 'pointer',
-                    opacity: atLimit ? 0.5 : 1,
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => {
-                    if (!atLimit) {
-                      e.currentTarget.style.background = '#e7b605';
-                      e.currentTarget.style.color = '#000';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = '#fff';
-                    e.currentTarget.style.color = '#9b7011';
-                  }}
-                >
-                  Use Recommended Default
-                </button>
-              </div>
+              {/* Desktop recommendation card */}
+              {!isMobile && renderRecommendationCard()}
 
               {/* Category-based discount presets */}
               <div style={{ marginBottom: 24 }}>
