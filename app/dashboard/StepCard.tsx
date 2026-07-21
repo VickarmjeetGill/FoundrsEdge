@@ -17,7 +17,7 @@ interface StepCardProps {
   actionHref: string;
   completed: boolean;
   onToggleComplete: () => void;
-  onDismiss: () => void;
+  onDismiss?: () => void;
   updating?: boolean;
 }
 
@@ -222,39 +222,43 @@ export default function StepCard({
             gap: '6px',
           }}
         >
-          <button
-            type="button"
-            onClick={onDismiss}
-            disabled={updating || completed}
-            style={{
-              padding: '7px 10px',
-              background: 'transparent',
-              border: 'none',
-              color: '#7b776f',
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor:
-                updating || completed
-                  ? 'not-allowed'
-                  : 'pointer',
-              opacity: updating || completed ? 0.5 : 1,
-              textDecoration: 'underline',
-              textUnderlineOffset: '3px',
-            }}
-          >
-            Not for me
-          </button>
+          {onDismiss && (
+            <>
+              <button
+                type="button"
+                onClick={onDismiss}
+                disabled={updating || completed}
+                style={{
+                  padding: '7px 10px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#7b776f',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor:
+                    updating || completed
+                      ? 'not-allowed'
+                      : 'pointer',
+                  opacity: updating || completed ? 0.5 : 1,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '3px',
+                }}
+              >
+                Not for me
+              </button>
 
-          <span
-            aria-hidden="true"
-            style={{
-              color: '#c8c4bc',
-              fontSize: '12px',
-            }}
-          >
-            ·
-          </span>
+              <span
+                aria-hidden="true"
+                style={{
+                  color: '#c8c4bc',
+                  fontSize: '12px',
+                }}
+              >
+                ·
+              </span>
+            </>
+          )}
 
           <button
             type="button"

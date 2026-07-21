@@ -729,38 +729,52 @@ export default function AICoachChat({
                                     key={q}
                                     onClick={() => { handleSend(undefined, q); setIsSidebarOpen(false); }}
                                     disabled={isLoading}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "10px",
-                                        width: "100%",
-                                        textAlign: "left",
-                                        padding: "10px 12px",
-                                        background: "#ffffff",
-                                        border: "1px solid #E5E7EB",
-                                        borderRadius: "10px",
-                                        fontSize: "13px",
-                                        fontWeight: 600,
-                                        color: "#374151",
-                                        cursor: isLoading ? "not-allowed" : "pointer",
-                                        fontFamily: "inherit",
-                                        transition: "border-color 0.15s, box-shadow 0.15s, transform 0.1s",
-                                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.borderColor = "rgba(231,182,5,0.6)";
-                                        e.currentTarget.style.boxShadow = "0 3px 10px rgba(231,182,5,0.12)";
-                                        e.currentTarget.style.transform = "translateY(-1px)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.borderColor = "#E5E7EB";
-                                        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
-                                        e.currentTarget.style.transform = "translateY(0)";
-                                    }}
-                                >
-                                    {questionIcons[q] ?? <HelpCircle size={13} style={{ color: "#e7b605", flexShrink: 0 }} />}
-                                    <span style={{ flex: 1 }}>{q}</span>
-                                    <ChevronRight size={12} style={{ color: "#D1D5DB", flexShrink: 0 }} />
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "16px",
+                                    width: "100%",
+                                    textAlign: "left",
+                                    padding: "14px 20px",
+                                    background: "#ffffff",
+                                    border: "1px solid #E5E7EB",
+                                    borderRadius: "12px",
+                                    fontSize: "13.5px",
+                                    fontWeight: 600,
+                                    color: "#3f3f46",
+                                    cursor: isLoading ? "not-allowed" : "pointer",
+                                    fontFamily: "inherit",
+                                    transition: "all 0.2s ease",
+                                    boxShadow: "0 1px 4px rgba(9,9,11,0.04)",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = "#e7b605";
+                                    e.currentTarget.style.backgroundColor = "#fefce8";
+                                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(231,182,5,0.15)";
+                                    e.currentTarget.style.transform = "translateY(-1px)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = "#E5E7EB";
+                                    e.currentTarget.style.backgroundColor = "#ffffff";
+                                    e.currentTarget.style.boxShadow = "0 1px 4px rgba(9,9,11,0.04)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }}
+                            >
+                                <div style={{
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    background: "#FFFBEB",
+                                    border: "1px solid rgba(231,182,5,0.2)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0
+                                }}>
+                                    {questionIcons[q] ?? <HelpCircle size={15} style={{ color: "#e7b605" }} />}
+                                </div>
+                                <span style={{ flex: 1, lineHeight: "1.4" }}>{q}</span>
+                                <ChevronRight size={14} style={{ color: "#A1A1AA", flexShrink: 0 }} />
                                 </button>
                             ))}
                         </div>

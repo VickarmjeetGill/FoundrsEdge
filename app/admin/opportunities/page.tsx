@@ -173,7 +173,7 @@ export default function AdminOpportunitiesPage() {
   });
 
   return (
-    <AdminLayout activeTab="opportunities">
+    <AdminLayout activeTab="dashboard">
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Header bar */}

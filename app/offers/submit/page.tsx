@@ -232,46 +232,29 @@ function OfferSubmitContent() {
       customDiscount: '',
     }));
 
-    function selectDiscountPreset(value: string) {
-      setForm(prev => ({
-        ...prev,
-        type: 'percentage',
-        discountValue: value,
-        discountUnit: '% off',
-        customDiscount: '',
-      }));
+    setErrors(prev => ({
+      ...prev,
+      discountValue: undefined,
+      customDiscount: undefined,
+    }));
+  }
 
-      setErrors(prev => ({
-        ...prev,
-        discountValue: undefined,
-        customDiscount: undefined,
-      }));
-    }
-
-
-    function selectDiscountPreset(preset: DiscountPreset) {
-      setForm(prev => ({
-        ...prev,
-        type: preset.offerType,
-        discountValue:
-          preset.offerType === 'percentage' ||
-            preset.offerType === 'fixed'
-            ? preset.value
-            : '',
-        discountUnit:
-          preset.offerType === 'percentage' ? '% off' : prev.discountUnit,
-        customDiscount:
-          preset.offerType === 'custom'
-            ? preset.customDiscount || preset.label
-            : '',
-      }));
-
-      setErrors(prev => ({
-        ...prev,
-        discountValue: undefined,
-        customDiscount: undefined,
-      }));
-    }
+  function selectDiscountPreset(preset: DiscountPreset) {
+    setForm(prev => ({
+      ...prev,
+      type: preset.offerType,
+      discountValue:
+        preset.offerType === 'percentage' ||
+        preset.offerType === 'fixed'
+          ? preset.value
+          : '',
+      discountUnit:
+        preset.offerType === 'percentage' ? '% off' : prev.discountUnit,
+      customDiscount:
+        preset.offerType === 'custom'
+          ? preset.customDiscount || preset.label
+          : '',
+    }));
 
     setErrors(prev => ({
       ...prev,
@@ -378,9 +361,6 @@ function OfferSubmitContent() {
       </div>
     );
   }
-
-  function renderRecommendationCard()
-  
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -783,7 +763,7 @@ function OfferSubmitContent() {
                           value={preset.value}
                           checked={isSelected}
                           disabled={atLimit}
-                          onChange={() => selectDiscountPreset(preset.value)}
+                          onChange={() => selectDiscountPreset(preset)}
                           style={{
                             position: 'absolute',
                             top: 16,

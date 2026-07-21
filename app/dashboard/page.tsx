@@ -7,6 +7,7 @@ import {
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
   UserCircle, Globe, MapPin, Rss, Sparkles, Menu, X as CloseIcon,
+  Bot
 } from 'lucide-react';
 import FeedSection from './FeedSection';
 import RoadmapSection from './RoadmapSection';
@@ -19,8 +20,10 @@ import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile, getRoadmap, toggleStepCompletion } from '@/app/actions/profile';
+import AICoachChat from '@/components/AICoachChat';
+import { getScorecardHistory } from '@/app/actions/scorecard';
 
-type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners' | 'roadmap' | 'matches';
+type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners' | 'roadmap' | 'matches' | 'coach';
 
 const defaultMember = {
   name: 'Loading User',
@@ -50,6 +53,7 @@ const recommendations = {
 const navItems: { icon: React.ElementType; label: string; section?: Section; href?: string }[] = [
   { icon: Rss, label: 'Feed', section: 'feed' },
   { icon: TrendingUp, label: 'Dashboard', section: 'dashboard' },
+  { icon: Bot, label: 'AI Business Coach', section: 'coach' },
   { icon: CheckCircle, label: 'My Roadmap', section: 'roadmap' },
   { icon: Calendar, label: 'Events', section: 'events' },
   { icon: Tag, label: 'Offers', section: 'offers' },
@@ -123,6 +127,7 @@ const sectionTitles: Record<Section, string> = {
   business: 'Business Profiles',
   owners: 'Owner Network',
   matches: 'My Matches',
+  coach: 'AI Business Coach',
 };
 
 // ── Shared label style ───────────────────────────────────────────
@@ -743,6 +748,18 @@ export default function DashboardPage() {
   const [nomPage, setNomPage] = useState(1);
   const [nomTotalPages, setNomTotalPages] = useState(1);
   const itemPerPage = 3;
+  const [latestScorecard, setLatestScorecard] = useState<any>(null);
+
+  const loadScorecard = async () => {
+    try {
+      const res = await getScorecardHistory();
+      if (res.success && res.submissions && res.submissions.length > 0) {
+        setLatestScorecard(res.submissions[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const [roadmapSteps, setRoadmapSteps] = useState<any[]>([]);
   const [completedStepIds, setCompletedStepIds] = useState<string[]>([]);
@@ -767,8 +784,27 @@ export default function DashboardPage() {
   };
 
   const handleToggleWidgetStep = async (stepId: string) => {
+    const isCompleted = completedStepIds.includes(stepId);
+    
+    // Optimistic update
+    if (isCompleted) {
+      setCompletedStepIds(prev => prev.filter(id => id !== stepId));
+    } else {
+      setCompletedStepIds(prev => [...prev, stepId]);
+    }
 
-    const [confirmModal, setConfirmModal] = useState<{
+    try {
+      const res = await toggleStepCompletion(stepId, !isCompleted);
+      if (!res.success) {
+        loadRoadmap();
+      }
+    } catch (err) {
+      console.error(err);
+      loadRoadmap();
+    }
+  };
+
+  const [confirmModal, setConfirmModal] = useState<{
       isOpen: boolean;
       title: string;
       message: string;
@@ -994,12 +1030,13 @@ export default function DashboardPage() {
       loadProfile();
       loadOffers();
       loadRoadmap();
+      loadScorecard();
 
       // Parse tab parameter from query string if present
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
         const tab = params.get('tab');
-        if (tab && ['dashboard', 'feed', 'events', 'offers', 'awards', 'business', 'owners', 'roadmap', 'matches'].includes(tab)) {
+        if (tab && ['dashboard', 'feed', 'events', 'offers', 'awards', 'business', 'owners', 'roadmap', 'matches', 'coach'].includes(tab)) {
           setActiveSection(tab as Section);
         }
       }
@@ -1636,8 +1673,10 @@ export default function DashboardPage() {
                   updating={completingStepId === nextWidgetStep.id}
                 />
               )}
+            </div>
+          )}
 
-              {/* Roadmap Widget: Congratulate if 100% complete */}
+          {/* Roadmap Widget: Congratulate if 100% complete */}
               {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
                 <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
                   <div>
@@ -1857,6 +1896,20 @@ export default function DashboardPage() {
               {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
               {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
               {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
+              {activeSection === 'coach' && userProfile && (
+                <div className="h-[calc(100vh-64px)] w-full">
+                  <AICoachChat
+                    userId={userProfile.id}
+                    userName={userProfile.name || member.name}
+                    userAvatarUrl={userProfile.avatarUrl || null}
+                    scorecard={latestScorecard ? {
+                      score: latestScorecard.score,
+                      categories: latestScorecard.categories as Record<string, number>,
+                      createdAt: latestScorecard.createdAt
+                    } : null}
+                  />
+                </div>
+              )}
             </main>
 
             {/* Custom Confirmation Modal */}
