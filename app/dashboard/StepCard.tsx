@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 
 interface StepCardProps {
@@ -22,7 +23,7 @@ interface StepCardProps {
 
 export default function StepCard({
   weekNumber,
-  type = 'Recommendation',
+  type = 'Recommended for you',
   title,
   description,
   actionText,
@@ -33,254 +34,272 @@ export default function StepCard({
   updating = false,
 }: StepCardProps) {
   const [hovered, setHovered] = useState(false);
+  const [actionHovered, setActionHovered] = useState(false);
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        position: 'relative',
+        overflow: 'hidden',
         background: '#fff',
-        border: completed
-          ? '1px solid rgba(231, 182, 5, 0.4)'
-          : hovered
-            ? '1px solid #9b7011'
-            : '1px solid #e2e0d8',
-        borderRadius: '8px',
-        padding: '20px 24px',
+        border: hovered
+          ? '1px solid #e7b605'
+          : '1px solid #e2e0d8',
+        borderRadius: '14px',
+        padding: '32px',
+        width: '100%',
+        minHeight: '280px',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '20px',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        gap: '28px',
+        transition: 'all 0.25s ease',
         boxShadow: hovered
-          ? '0 6px 16px rgba(155, 112, 17, 0.05)'
-          : '0 2px 4px rgba(0, 0, 0, 0.01)',
+          ? '0 14px 34px rgba(42, 40, 32, 0.08)'
+          : '0 6px 20px rgba(42, 40, 32, 0.04)',
         opacity: updating ? 0.7 : 1,
       }}
     >
       <div
+        aria-hidden="true"
         style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '16px',
-          flex: '1 1 280px',
-          minWidth: 0,
+          position: 'absolute',
+          top: '-70px',
+          right: '-70px',
+          width: '190px',
+          height: '190px',
+          borderRadius: '50%',
+          background: 'rgba(231, 182, 5, 0.08)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          bottom: '-95px',
+          left: '-95px',
+          width: '210px',
+          height: '210px',
+          borderRadius: '50%',
+          background: 'rgba(231, 182, 5, 0.04)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '760px',
         }}
       >
         <div
-          aria-hidden="true"
           style={{
-            background: completed
-              ? '#e7b605'
-              : 'rgba(231, 182, 5, 0.08)',
-            border: completed
-              ? '2px solid #e7b605'
-              : '2px solid rgba(231, 182, 5, 0.45)',
-            borderRadius: '50%',
-            width: '24px',
-            height: '24px',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: completed ? '#000' : '#9b7011',
-            marginTop: '2px',
-            flexShrink: 0,
+            gap: '8px',
+            padding: '6px 10px',
+            marginBottom: '18px',
+            background: 'rgba(231, 182, 5, 0.1)',
+            border: '1px solid rgba(231, 182, 5, 0.25)',
+            borderRadius: '999px',
           }}
         >
-          <CheckCircle2 size={14} style={{ strokeWidth: 3 }} />
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            minWidth: 0,
-          }}
-        >
-          <div
+          <Sparkles
+            size={14}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '4px',
+              color: '#9b7011',
+              flexShrink: 0,
             }}
-          >
-            <span
-              style={{
-                fontSize: '18px',
-              }}
-            >
-              💡
-            </span>
+          />
 
-            <span
-              style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontWeight: 800,
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: '#9b7011',
-              }}
-            >
-              {type}
-            </span>
-          </div>
-
-          <h4
+          <span
             style={{
-              margin: 0,
               fontFamily: 'DM Sans, sans-serif',
               fontWeight: 800,
-              fontSize: '17px',
-              color: completed ? '#9a9585' : '#2a2820',
-              textDecoration: completed ? 'line-through' : 'none',
+              fontSize: '11px',
+              color: '#9b7011',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
             }}
           >
-            {title}
-          </h4>
-
-          <p
-            style={{
-              margin: '6px 0 0 0',
-              fontFamily: 'Noto Serif, serif',
-              fontSize: '14px',
-              color: completed ? '#b8b4ae' : '#5a5650',
-              lineHeight: 1.6,
-              textDecoration: completed ? 'line-through' : 'none',
-            }}
-          >
-            {description}
-          </p>
+            {type}
+          </span>
         </div>
+
+        <h3
+          style={{
+            margin: '0 0 12px 0',
+            maxWidth: '680px',
+            fontFamily: 'DM Sans, sans-serif',
+            fontWeight: 900,
+            fontSize: 'clamp(24px, 3vw, 34px)',
+            lineHeight: 1.15,
+            color: completed ? '#9a9585' : '#2a2820',
+            textDecoration: completed ? 'line-through' : 'none',
+          }}
+        >
+          {title}
+        </h3>
+
+        <p
+          style={{
+            margin: 0,
+            maxWidth: '660px',
+            fontFamily: 'Noto Serif, serif',
+            fontSize: '15px',
+            lineHeight: 1.7,
+            color: completed ? '#b8b4ae' : '#5a5650',
+            textDecoration: completed ? 'line-through' : 'none',
+          }}
+        >
+          {description}
+        </p>
       </div>
 
       <div
         style={{
+          position: 'relative',
+          zIndex: 1,
           display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '10px',
-          flexShrink: 0,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          gap: '14px',
         }}
       >
         <a
           href={actionHref}
+          onMouseEnter={() => setActionHovered(true)}
+          onMouseLeave={() => setActionHovered(false)}
           style={{
+            width: '100%',
+            maxWidth: '360px',
+            minHeight: '52px',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
-            padding: '9px 16px',
-            background: hovered ? '#000' : 'transparent',
-            border: hovered
-              ? '1px solid #000'
-              : '1px solid #e2e0d8',
-            borderRadius: '6px',
+            gap: '10px',
+            padding: '14px 22px',
+            background: actionHovered ? '#e7b605' : '#000',
+            border: actionHovered
+              ? '1px solid #e7b605'
+              : '1px solid #000',
+            borderRadius: '8px',
+            color: actionHovered ? '#000' : '#fff',
             textDecoration: 'none',
-            color: hovered ? '#fff' : '#2a2820',
-            fontSize: '12px',
-            fontWeight: 700,
             fontFamily: 'DM Sans, sans-serif',
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            fontSize: '14px',
+            fontWeight: 800,
+            transition: 'all 0.2s ease',
             pointerEvents: updating ? 'none' : 'auto',
+            boxShadow: actionHovered
+              ? '0 8px 18px rgba(231, 182, 5, 0.22)'
+              : 'none',
           }}
         >
           {actionText}
 
           <ArrowRight
-            size={13}
+            size={16}
             style={{
-              transition: 'transform 0.2s',
-              transform: hovered ? 'translateX(2px)' : 'none',
+              transition: 'transform 0.2s ease',
+              transform: actionHovered
+                ? 'translateX(3px)'
+                : 'translateX(0)',
             }}
           />
         </a>
 
-        <button
-          type="button"
-          onClick={onDismiss}
-          disabled={updating || completed}
+        <div
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '9px 16px',
-            background: 'transparent',
-            border: '1px solid #e2e0d8',
-            borderRadius: '6px',
-            color: '#5a5650',
-            fontFamily: 'DM Sans, sans-serif',
-            fontSize: '12px',
-            fontWeight: 700,
-            cursor:
-              updating || completed
-                ? 'not-allowed'
-                : 'pointer',
-            opacity: updating || completed ? 0.6 : 1,
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={e => {
-            if (!updating && !completed) {
-              e.currentTarget.style.borderColor = '#9a9585';
-              e.currentTarget.style.background = '#f7f6f2';
-              e.currentTarget.style.color = '#2a2820';
-            }
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = '#e2e0d8';
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#5a5650';
+            flexWrap: 'wrap',
+            gap: '6px',
           }}
         >
-          Not for me
-        </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={updating || completed}
+            style={{
+              padding: '7px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: '#7b776f',
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor:
+                updating || completed
+                  ? 'not-allowed'
+                  : 'pointer',
+              opacity: updating || completed ? 0.5 : 1,
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+            }}
+          >
+            Not for me
+          </button>
 
-        <button
-          type="button"
-          onClick={onToggleComplete}
-          disabled={updating || completed}
-          style={{
-            minWidth: '84px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '7px',
-            padding: '9px 16px',
-            background: completed ? '#27ae60' : '#e7b605',
-            border: completed
-              ? '1px solid #27ae60'
-              : '1px solid #e7b605',
-            borderRadius: '6px',
-            color: completed ? '#fff' : '#000',
-            fontFamily: 'DM Sans, sans-serif',
-            fontSize: '12px',
-            fontWeight: 800,
-            cursor:
-              updating || completed
-                ? 'not-allowed'
-                : 'pointer',
-            opacity: updating ? 0.7 : 1,
-            transition: 'all 0.2s',
-          }}
-        >
-          {updating ? (
-            <>
-              <Loader2
-                size={13}
-                className="animate-spin"
-              />
-              Saving
-            </>
-          ) : (
-            <>
-              <CheckCircle2 size={13} />
-              Done
-            </>
-          )}
-        </button>
+          <span
+            aria-hidden="true"
+            style={{
+              color: '#c8c4bc',
+              fontSize: '12px',
+            }}
+          >
+            ·
+          </span>
+
+          <button
+            type="button"
+            onClick={onToggleComplete}
+            disabled={updating || completed}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '7px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: completed ? '#27ae60' : '#7b776f',
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor:
+                updating || completed
+                  ? 'not-allowed'
+                  : 'pointer',
+              opacity: updating ? 0.6 : 1,
+            }}
+          >
+            {updating ? (
+              <>
+                <Loader2
+                  size={13}
+                  className="animate-spin"
+                />
+                Saving
+              </>
+            ) : completed ? (
+              <>
+                <CheckCircle2 size={13} />
+                Completed
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={13} />
+                Mark as done
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
