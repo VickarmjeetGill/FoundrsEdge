@@ -9,6 +9,7 @@ import {
 
 interface StepCardProps {
   weekNumber: number;
+  type?: string;
   title: string;
   description: string;
   actionText: string;
@@ -21,6 +22,7 @@ interface StepCardProps {
 
 export default function StepCard({
   weekNumber,
+  type = 'Recommendation',
   title,
   description,
   actionText,
@@ -57,7 +59,6 @@ export default function StepCard({
         opacity: updating ? 0.7 : 1,
       }}
     >
-      {/* Left side: Week and recommendation details */}
       <div
         style={{
           display: 'flex',
@@ -67,11 +68,12 @@ export default function StepCard({
           minWidth: 0,
         }}
       >
-        {/* Recommendation status icon */}
         <div
           aria-hidden="true"
           style={{
-            background: completed ? '#e7b605' : 'rgba(231, 182, 5, 0.08)',
+            background: completed
+              ? '#e7b605'
+              : 'rgba(231, 182, 5, 0.08)',
             border: completed
               ? '2px solid #e7b605'
               : '2px solid rgba(231, 182, 5, 0.45)',
@@ -89,7 +91,6 @@ export default function StepCard({
           <CheckCircle2 size={14} style={{ strokeWidth: 3 }} />
         </div>
 
-        {/* Content details */}
         <div
           style={{
             display: 'flex',
@@ -102,54 +103,53 @@ export default function StepCard({
             style={{
               display: 'flex',
               alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '10px',
+              gap: '8px',
+              marginBottom: '4px',
             }}
           >
-            {/* Week badge */}
+            <span
+              style={{
+                fontSize: '18px',
+              }}
+            >
+              💡
+            </span>
+
             <span
               style={{
                 fontFamily: 'DM Sans, sans-serif',
                 fontWeight: 800,
                 fontSize: '11px',
-                background: completed ? '#000' : '#f0efe9',
-                color: completed ? '#e7b605' : '#5a5650',
-                padding: '3px 8px',
-                borderRadius: '4px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                flexShrink: 0,
+                letterSpacing: '0.06em',
+                color: '#9b7011',
               }}
             >
-              Week {weekNumber}
+              {type}
             </span>
-
-            {/* Step title */}
-            <h4
-              style={{
-                margin: 0,
-                fontFamily: 'DM Sans, sans-serif',
-                fontWeight: 700,
-                fontSize: '15px',
-                color: completed ? '#9a9585' : '#2a2820',
-                textDecoration: completed ? 'line-through' : 'none',
-                transition: 'color 0.2s',
-              }}
-            >
-              {title}
-            </h4>
           </div>
 
-          {/* Step description */}
-          <p
+          <h4
             style={{
               margin: 0,
-              fontFamily: 'Noto Serif, serif',
-              fontSize: '13px',
-              color: completed ? '#b8b4ae' : '#5a5650',
-              lineHeight: 1.5,
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: 800,
+              fontSize: '17px',
+              color: completed ? '#9a9585' : '#2a2820',
               textDecoration: completed ? 'line-through' : 'none',
-              transition: 'color 0.2s',
+            }}
+          >
+            {title}
+          </h4>
+
+          <p
+            style={{
+              margin: '6px 0 0 0',
+              fontFamily: 'Noto Serif, serif',
+              fontSize: '14px',
+              color: completed ? '#b8b4ae' : '#5a5650',
+              lineHeight: 1.6,
+              textDecoration: completed ? 'line-through' : 'none',
             }}
           >
             {description}
@@ -157,7 +157,6 @@ export default function StepCard({
         </div>
       </div>
 
-      {/* Right side: Action and Done buttons */}
       <div
         style={{
           display: 'flex',
@@ -202,6 +201,45 @@ export default function StepCard({
 
         <button
           type="button"
+          onClick={onDismiss}
+          disabled={updating || completed}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '9px 16px',
+            background: 'transparent',
+            border: '1px solid #e2e0d8',
+            borderRadius: '6px',
+            color: '#5a5650',
+            fontFamily: 'DM Sans, sans-serif',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor:
+              updating || completed
+                ? 'not-allowed'
+                : 'pointer',
+            opacity: updating || completed ? 0.6 : 1,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => {
+            if (!updating && !completed) {
+              e.currentTarget.style.borderColor = '#9a9585';
+              e.currentTarget.style.background = '#f7f6f2';
+              e.currentTarget.style.color = '#2a2820';
+            }
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = '#e2e0d8';
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = '#5a5650';
+          }}
+        >
+          Not for me
+        </button>
+
+        <button
+          type="button"
           onClick={onToggleComplete}
           disabled={updating || completed}
           style={{
@@ -235,11 +273,6 @@ export default function StepCard({
                 className="animate-spin"
               />
               Saving
-            </>
-          ) : completed ? (
-            <>
-              <CheckCircle2 size={13} />
-              Done
             </>
           ) : (
             <>

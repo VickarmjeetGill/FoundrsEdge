@@ -1621,6 +1621,7 @@ export default function DashboardPage() {
               ) : (
                 <StepCard
                   weekNumber={nextWidgetStep.weekNumber}
+                  type={nextWidgetStep.type}
                   title={nextWidgetStep.title}
                   description={nextWidgetStep.description}
                   actionText={nextWidgetStep.actionText}
