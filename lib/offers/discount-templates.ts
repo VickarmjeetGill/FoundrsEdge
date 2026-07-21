@@ -1,0 +1,255 @@
+export type DiscountPreset = {
+    value: string;
+    label: string;
+    description: string;
+    offerType: 'percentage' | 'fixed' | 'bogo' | 'custom';
+    recommended?: boolean;
+    customDiscount?: string;
+};
+
+export const categoryDiscountPresets: Record<string, DiscountPreset[]> = {
+    'Professional Services': [
+        {
+            value: '20',
+            label: '20% Off First Service',
+            description:
+                'Give Founders Edge members 20% off their first eligible professional service.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'free-consultation',
+            label: 'Free Consultation',
+            description:
+                'Offer members one complimentary introductory consultation.',
+            offerType: 'custom',
+            customDiscount: 'Free consultation',
+        },
+
+        {
+            value: 'free-strategy-session',
+            label: 'Free Strategy Session',
+            description:
+                'Provide members with one complimentary strategy session.',
+            offerType: 'custom',
+            customDiscount: 'Free strategy session',
+        },
+    ],
+
+    'Marketing & Design': [
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'Recommended for smaller creative services.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'Ideal for projects and design packages.',
+            offerType: 'percentage',
+        },
+
+        {
+            value: '20',
+            label: '20% Off',
+            description: 'A high-value member-exclusive promotion.',
+            offerType: 'percentage',
+        },
+    ],
+
+    Technology: [
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'Recommended for subscriptions and setup fees.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'Useful for onboarding or implementation.',
+            offerType: 'percentage',
+        },
+        {
+            value: '20',
+            label: '20% Off',
+            description: 'Best for annual plans or larger packages.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+    ],
+
+    'Finance & Legal': [
+        {
+            value: '5',
+            label: '5% Off',
+            description: 'A modest discount for professional services.',
+            offerType: 'percentage',
+        },
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'Recommended for consultations and reviews.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'Best for larger service packages.',
+            offerType: 'percentage',
+        },
+    ],
+
+    'Health & Wellness': [
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'Recommended for individual appointments.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'Ideal for treatments or wellness services.',
+            offerType: 'percentage',
+        },
+        {
+            value: '20',
+            label: '20% Off',
+            description: 'Best for packages or first-time clients.',
+            recommended: true,
+            offerType: 'percentage',
+        },
+    ],
+
+    'Events & Venues': [
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'Recommended for bookings and event services.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'Ideal for venue or package discounts.',
+            offerType: 'percentage',
+        },
+        {
+            value: '20',
+            label: '20% Off',
+            description: 'A strong incentive for larger bookings.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+    ],
+
+    'Retail & Products': [
+        {
+            value: '20',
+            label: '20% Off',
+            description:
+                'Give Founders Edge members 20% off eligible retail products or purchases.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'spend-100-get-20',
+            label: 'Spend $100, Get $20 Off',
+            description:
+                'Members receive $20 off when they spend at least $100 on eligible products.',
+            offerType: 'custom',
+            customDiscount: 'Spend $100, get $20 off',
+        },
+        {
+            value: 'free-gift',
+            label: 'Free Gift',
+            description:
+                'Include a complimentary gift with an eligible member purchase.',
+            offerType: 'custom',
+            customDiscount: 'Free gift with purchase',
+        },
+    ],
+
+    'Food & Beverage': [
+        {
+            value: '20',
+            label: '20% Off',
+            description:
+                'Give Founders Edge members 20% off eligible restaurant purchases.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'bogo-50',
+            label: 'Buy One, Get the Second 50% Off',
+            description:
+                'Members purchase one eligible item and receive the second item at 50% off.',
+            offerType: 'custom',
+            customDiscount: 'Buy one, get the second 50% off',
+        },
+        {
+            value: 'free-appetizer',
+            label: 'Free Appetizer',
+            description:
+                'Offer members one complimentary appetizer with an eligible purchase.',
+            offerType: 'custom',
+            customDiscount: 'Free appetizer with purchase',
+        },
+    ],
+
+    Golf: [
+        {
+            value: '20',
+            label: '20% Off Green Fees',
+            description:
+                'Give Founders Edge members 20% off eligible green-fee bookings.',
+            offerType: 'percentage',
+            recommended: true,
+        },
+        {
+            value: 'bogo-round',
+            label: 'BOGO Round',
+            description:
+                'Members purchase one eligible round and receive a second round free.',
+            offerType: 'bogo',
+        },
+        {
+            value: 'free-bucket-of-balls',
+            label: 'Free Bucket of Balls',
+            description:
+                'Offer members one complimentary bucket of practice balls.',
+            offerType: 'custom',
+            customDiscount: 'Free bucket of balls',
+        },
+    ],
+
+
+
+    Other: [
+        {
+            value: '10',
+            label: '10% Off',
+            description: 'A safe and simple recommended discount.',
+            offerType: 'percentage',
+        },
+        {
+            value: '15',
+            label: '15% Off',
+            description: 'A balanced member-exclusive incentive.',
+            offerType: 'percentage',
+        },
+        {
+            value: '20',
+            label: '20% Off',
+            description: 'A high-value promotional option.',
+            recommended: true,
+            offerType: 'percentage',
+        },
+    ],
+};
+
+export const discountTemplateCategories = Object.keys(
+    categoryDiscountPresets
+);

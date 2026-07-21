@@ -4,7 +4,15 @@ import { getCurrentUser } from '@/lib/session';
 import { invalidateCache } from '@/lib/redis';
 import { rateLimit } from '@/lib/rate-limiter';
 import { validateBody } from '@/lib/validate';
-import { IsString, IsNotEmpty, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+import {
+    IsBoolean,
+    IsDateString,
+    IsIn,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+} from 'class-validator';
+
 
 export class CreateOfferDto {
     @IsString()
@@ -30,6 +38,28 @@ export class CreateOfferDto {
     @IsOptional()
     @IsString()
     discountValue?: string;
+
+    @IsOptional()
+    @IsString()
+    discountTemplate?: string;
+
+
+
+    @IsOptional()
+    @IsIn(
+        [
+            'restaurant',
+            'retail',
+            'professional_services',
+            'golf',
+            'other',
+        ],
+        {
+            message:
+                'Discount category must be restaurant, retail, professional_services, golf, or other',
+        }
+    )
+    discountCategory?: string;
 
     @IsOptional()
     @IsString()
@@ -66,6 +96,33 @@ export class CreateOfferDto {
     @IsOptional()
     @IsBoolean()
     agreeGuidelines?: boolean;
+}
+
+function getOfferTemplateLabel(offer: {
+    type: string;
+    is_passport?: boolean | null;
+    passport_type?: string | null;
+}) {
+    if (offer.passport_type) {
+        return offer.passport_type
+            .replace(/[_-]/g, ' ')
+            .replace(/\b\w/g, letter => letter.toUpperCase());
+    }
+
+    if (offer.is_passport) {
+        return 'Passport Offer';
+    }
+
+    const templateLabels: Record<string, string> = {
+        percentage: 'Percentage Discount',
+        fixed: 'Fixed Amount Discount',
+        bogo: 'Buy One Get One',
+        custom: 'Custom Offer',
+        event: 'Event Offer',
+        affiliate: 'Affiliate Offer',
+    };
+
+    return templateLabels[offer.type?.toLowerCase()] || 'Standard Offer';
 }
 
 export async function GET(request: NextRequest) {
@@ -187,10 +244,13 @@ export async function GET(request: NextRequest) {
                     id: true,
                     title: true,
                     description: true,
+                    business_id: true,
                     business_name: true,
                     category: true,
                     type: true,
                     discount_value: true,
+                    discount_template: true,
+                    discount_category: true,
                     status: true,
                     expiry_date: true,
                     featured: true,
@@ -213,6 +273,13 @@ export async function GET(request: NextRequest) {
             prisma.offers.count({ where })
         ]);
 
+
+        const offersWithTemplateLabels = offers.map((offer) => ({
+            ...offer,
+            template_label: getOfferTemplateLabel(offer),
+        }));
+
+
         let stats = null;
         if (adminView) {
             const [totalCount, pendingCount, approvedCount, rejectedCount] = await Promise.all([
@@ -229,9 +296,14 @@ export async function GET(request: NextRequest) {
             };
         }
 
+        const offersWithBusinessDirectoryId = offers.map((offer) => ({
+            ...offer,
+            business_directory_id: offer.business_id,
+        }));
+
         if (isPaginated) {
             return NextResponse.json({
-                offers,
+                offers: offersWithTemplateLabels,
                 stats,
                 pagination: {
                     total,
@@ -242,7 +314,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        return NextResponse.json(offers);
+        return NextResponse.json(offersWithTemplateLabels);
 
     } catch (error: any) {
         console.error('Error fetching offers:', error);
@@ -315,6 +387,8 @@ export async function POST(request: Request) {
                 category: data.category,
                 type: data.type,
                 discount_value: data.discountValue || null,
+                discount_template: data.discountTemplate || null,
+                discount_category: data.discountCategory || null,
                 title: data.title,
                 description: data.description,
                 location: data.location || null,

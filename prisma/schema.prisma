@@ -21,30 +21,61 @@ model businesses {
   referral_partner_industries String[]
   priorities                  String[]
   open_to_matching            Boolean?  @default(true)
-  status   String  @default("PENDING")
-featured Boolean @default(false)
-removed  Boolean @default(false)
+  status                      String    @default("PENDING")
+  featured                    Boolean   @default(false)
+  removed                     Boolean   @default(false)
   created_at                  DateTime? @default(now()) @db.Timestamptz(6)
+<<<<<<< HEAD
   business_directory          business_directory?
   members                     members?  @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   offers                      offers[]
+=======
+>>>>>>> 706a8094443ae2f5d6356cf8433fb25813cb58b2
 
-  //indexing the member_id foreign key
+  members           members?           @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  offers            offers[]           @relation("OfferBusiness")
+  directory_profile BusinessDirectory?
+
   @@index([member_id])
   @@index([business_name])
 }
 
+model BusinessDirectory {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  business_id   String   @unique @db.Uuid
+  name          String
+  category      String?
+  description   String?
+  logo_url      String?
+  website       String?
+  location      String?
+  contact_email String?
+  is_featured   Boolean  @default(false)
+  status        String   @default("PENDING")
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+
+  business businesses @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  offers   offers[]
+
+  @@index([category])
+  @@index([status])
+  @@index([is_featured])
+  @@map("business_directory")
+}
+
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model members {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  first_name  String
-  last_name   String
-  email       String        @unique
-  phone       String?
-  linkedin    String?
-  stage       String?
-  industry    String?
-  created_at  DateTime?     @default(now()) @db.Timestamptz(6)
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  first_name String
+  last_name  String
+  email      String    @unique
+  phone      String?
+  linkedin   String?
+  stage      String?
+  industry   String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+
   businesses  businesses[]
   events      events[]
   offers      offers[]
@@ -52,20 +83,19 @@ model members {
 }
 
 model User {
-  id                  String   @id @default(cuid())
-  email               String   @unique
-  password            String
-  name                String?
-  refreshToken        String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  role                String   @default("MEMBER")
-  status              String   @default("ACTIVE")
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  name         String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         String   @default("MEMBER")
+  status       String   @default("ACTIVE")
 
   avatarUrl           String?
   track               String?
   completedMilestones String[]
-
 
   roadmapProgress UserRoadmapProgress[]
   scorecardSubmissions ScorecardSubmission[]
@@ -119,16 +149,16 @@ model ScorecardSubmission {
 
 
 model RoadmapStep {
-  id String @id @default(cuid())
-  track String 
-  weekNumber Int
-  title String
+  id          String   @id @default(cuid())
+  track       String
+  weekNumber  Int
+  title       String
   description String
-  actionText String
-  actionHref String
-  order Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  actionText  String
+  actionHref  String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   progress UserRoadmapProgress[]
 
@@ -137,22 +167,22 @@ model RoadmapStep {
 }
 
 model UserRoadmapProgress {
-  id String @id @default(cuid())
-  userId String
-  stepId String
-  completed Boolean @default(false)
+  id          String    @id @default(cuid())
+  userId      String
+  stepId      String
+  completed   Boolean   @default(false)
   completedAt DateTime?
 
-  user User @relation(fields: [userId], references :[id], onDelete: Cascade)
-  step RoadmapStep @relation(fields: [stepId], references :[id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@unique([userId, stepId])
   @@index([userId])
   @@index([stepId])
-
 }
 
 model offers {
+<<<<<<< HEAD
   id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   member_id       String?     @db.Uuid
   business_id     String?     @db.Uuid
@@ -181,9 +211,42 @@ model offers {
   discount_category     String?
   discount_template     String?
   business_directory    business_directory? @relation(fields: [business_directory_id], references: [id])
+=======
+  id                    String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  member_id             String? @db.Uuid
+  business_id           String? @db.Uuid
+  business_directory_id String? @db.Uuid
+
+  business_name     String
+  category          String
+  type              String
+  discount_value    String?
+  discount_template String?
+  discount_category String?
+  title             String
+  description       String
+  location          String?
+  expiry_date       DateTime
+  fe_discount       String?
+  events_page_url   String?
+  how_to_redeem     String?
+  is_affiliate      Boolean  @default(false)
+  status            String   @default("PENDING")
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
+  featured          Boolean  @default(false)
+  is_passport       Boolean  @default(false)
+  passport_type     String?
+  promo_code        String?
+
+  businesses         businesses?        @relation("OfferBusiness", fields: [business_id], references: [id])
+  business_directory BusinessDirectory? @relation(fields: [business_directory_id], references: [id], onDelete: SetNull)
+  members            members?           @relation(fields: [member_id], references: [id])
+>>>>>>> 706a8094443ae2f5d6356cf8433fb25813cb58b2
 
   @@index([member_id])
   @@index([business_id])
+  @@index([business_directory_id])
   @@index([status])
   @@index([category])
   @@index([type])
@@ -206,8 +269,8 @@ model partners {
   contact_email String?
   status        String      @default("ACTIVE")
   featured      Boolean     @default(false)
-  created_at    DateTime    @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at    DateTime    @updatedAt @db.Timestamptz(6) @map("updated_at")
+  created_at    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   resources     resources[]
 
   @@index([name])
@@ -217,7 +280,7 @@ model partners {
 /// Curated resources shown on the Resources hub; optionally attached to a partner.
 model resources {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  partner_id  String?   @db.Uuid @map("partner_id")
+  partner_id  String?   @map("partner_id") @db.Uuid
   title       String
   description String?
   url         String?
@@ -226,15 +289,14 @@ model resources {
   tags        String[]  @default([])
   featured    Boolean   @default(false)
   status      String    @default("PUBLISHED")
-  created_at  DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
-  updated_at  DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   partner     partners? @relation(fields: [partner_id], references: [id], onDelete: SetNull)
 
   @@index([partner_id])
   @@index([category])
   @@index([status])
 }
-
 
 model events {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -422,6 +484,7 @@ model post_email_usage {
   @@index([email])
 }
 
+<<<<<<< HEAD
 model opportunities {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
@@ -475,4 +538,18 @@ model business_directory {
 }
 
 
+=======
+model DiscountTemplates {
+  id                   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category             String
+  template_label       String
+  template_description String
+  is_recommended       Boolean @default(false)
+>>>>>>> 706a8094443ae2f5d6356cf8433fb25813cb58b2
 
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([category])
+  @@index([is_recommended])
+}

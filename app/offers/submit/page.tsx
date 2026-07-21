@@ -5,8 +5,15 @@ import Link from 'next/link';
 import { CheckCircle, ArrowLeft, AlertCircle, Percent, Gift, Tag, Zap } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import type { Offer } from '../page';
+import {
+  categoryDiscountPresets,
+  type DiscountPreset,
+} from '@/lib/offers/discount-templates';
+
+
 
 type OfferType = 'percentage' | 'bogo' | 'fixed' | 'custom';
+
 
 type FormData = {
   businessName: string;
@@ -32,7 +39,7 @@ const initialForm: FormData = {
   businessName: '',
   title: '',
   type: 'percentage',
-  discountValue: '',
+  discountValue: '10',
   discountUnit: '% off',
   customDiscount: '',
   description: '',
@@ -55,15 +62,47 @@ const offerCategories = [
   'Events & Venues',
   'Retail & Products',
   'Food & Beverage',
+  'Golf',
   'Other',
 ];
 
-const typeOptions: { value: OfferType; label: string; icon: React.ReactNode; hint: string; example: string }[] = [
-  { value: 'percentage', icon: <Percent size={18} />, label: 'Percentage Off', hint: 'e.g. 10% off your first consultation', example: '10% off' },
-  { value: 'bogo', icon: <Gift size={18} />, label: 'Buy One Get One', hint: 'e.g. Buy one session, get one free', example: 'Buy 1 Get 1' },
-  { value: 'fixed', icon: <Tag size={18} />, label: 'Fixed Amount Off', hint: 'e.g. $50 off your first order', example: '$50 off' },
-  { value: 'custom', icon: <Zap size={18} />, label: 'Custom Offer', hint: 'Write your own offer headline', example: 'Free audit' },
-];
+
+
+
+
+const typeOptions: {
+  value: OfferType;
+  label: string;
+  icon: React.ReactNode;
+  hint: string;
+  example: string;
+  popular: boolean;
+}[] = [
+    {
+      value: 'bogo',
+      icon: <Gift size={18} />,
+      label: 'Buy One Get One',
+      hint: 'e.g. Buy one session, get one free',
+      example: 'Buy 1 Get 1',
+      popular: false,
+    },
+    {
+      value: 'fixed',
+      icon: <Tag size={18} />,
+      label: 'Fixed Amount Off',
+      hint: 'e.g. $50 off your first order',
+      example: '$50 off',
+      popular: false,
+    },
+    {
+      value: 'custom',
+      icon: <Zap size={18} />,
+      label: 'Custom Offer',
+      hint: 'Write your own offer headline',
+      example: 'Free audit',
+      popular: false,
+    },
+  ];
 
 function buildDiscount(form: FormData): string {
   if (form.type === 'percentage') return `${form.discountValue}% off`;
@@ -98,6 +137,21 @@ function OfferSubmitContent() {
   const [submitted, setSubmitted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [offerCount, setOfferCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const recommendationStreak = 3;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // Pre-fill form when editing and load offer count
   useEffect(() => {
@@ -151,10 +205,182 @@ function OfferSubmitContent() {
     loadFormContext();
   }, [editId]);
 
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
+
   function handleChange(field: keyof FormData, value: string | boolean) {
     setForm(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }));
   }
+
+  function useRecommendedDefault() {
+    setForm(prev => ({
+      ...prev,
+      type: 'percentage',
+      discountValue: '10',
+      discountUnit: '% off',
+      customDiscount: '',
+    }));
+
+    function selectDiscountPreset(value: string) {
+      setForm(prev => ({
+        ...prev,
+        type: 'percentage',
+        discountValue: value,
+        discountUnit: '% off',
+        customDiscount: '',
+      }));
+
+      setErrors(prev => ({
+        ...prev,
+        discountValue: undefined,
+        customDiscount: undefined,
+      }));
+    }
+
+
+    function selectDiscountPreset(preset: DiscountPreset) {
+      setForm(prev => ({
+        ...prev,
+        type: preset.offerType,
+        discountValue:
+          preset.offerType === 'percentage' ||
+            preset.offerType === 'fixed'
+            ? preset.value
+            : '',
+        discountUnit:
+          preset.offerType === 'percentage' ? '% off' : prev.discountUnit,
+        customDiscount:
+          preset.offerType === 'custom'
+            ? preset.customDiscount || preset.label
+            : '',
+      }));
+
+      setErrors(prev => ({
+        ...prev,
+        discountValue: undefined,
+        customDiscount: undefined,
+      }));
+    }
+
+    setErrors(prev => ({
+      ...prev,
+      discountValue: undefined,
+      customDiscount: undefined,
+    }));
+  }
+
+  function renderRecommendationCard() {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: isMobile ? 12 : 16,
+          padding: isMobile ? '14px' : '16px 18px',
+          marginBottom: isMobile ? 16 : 24,
+          background: 'rgba(231,182,5,0.06)',
+          border: '1px solid rgba(231,182,5,0.3)',
+          borderLeft: '4px solid #e7b605',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: 800,
+              fontSize: isMobile ? '13px' : '14px',
+              color: '#2a2820',
+              marginBottom: 4,
+            }}
+          >
+            Not sure which offer type to choose?
+          </div>
+
+          <div
+            style={{
+              fontFamily: 'Noto Serif, serif',
+              color: '#5a5650',
+              fontSize: isMobile ? '12px' : '13px',
+              lineHeight: 1.5,
+            }}
+          >
+            Use our recommended default: a simple 10% member discount.
+          </div>
+        </div>
+
+<div
+  style={{
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    padding: '6px 10px',
+    background: 'rgba(231,182,5,0.12)',
+    border: '1px solid rgba(231,182,5,0.3)',
+    borderRadius: 999,
+    fontFamily: 'DM Sans, sans-serif',
+    fontSize: isMobile ? '11px' : '12px',
+    fontWeight: 700,
+    color: '#7a580d',
+    lineHeight: 1.4,
+  }}
+>
+  <span aria-hidden="true">🔥</span>
+  <span>
+    You have acted on your recommendation {recommendationStreak} weeks in a row
+  </span>
+</div>
+
+        <button
+          type="button"
+          onClick={useRecommendedDefault}
+          disabled={atLimit}
+          style={{
+            width: isMobile ? '100%' : 'auto',
+            flexShrink: 0,
+            padding: '10px 16px',
+            border: '1px solid #e7b605',
+            background: '#fff',
+            color: '#9b7011',
+            fontFamily: 'DM Sans, sans-serif',
+            fontWeight: 800,
+            fontSize: '12px',
+            cursor: atLimit ? 'not-allowed' : 'pointer',
+            opacity: atLimit ? 0.5 : 1,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={event => {
+            if (!atLimit) {
+              event.currentTarget.style.background = '#e7b605';
+              event.currentTarget.style.color = '#000';
+            }
+          }}
+          onMouseLeave={event => {
+            event.currentTarget.style.background = '#fff';
+            event.currentTarget.style.color = '#9b7011';
+          }}
+        >
+          Use Recommended Default
+        </button>
+      </div>
+    );
+  }
+
+  function renderRecommendationCard()
+  
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -169,7 +395,11 @@ function OfferSubmitContent() {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        discountTemplate: form.type,
+        discountCategory: form.category,
+      }),
     });
 
     if (response.ok) {
@@ -213,9 +443,25 @@ function OfferSubmitContent() {
   const MAX_OFFERS = 3;
   const atLimit = !isEditing && offerCount >= MAX_OFFERS;
 
+  const currentDiscountPresets =
+    categoryDiscountPresets[form.category] ??
+    categoryDiscountPresets.Other;
+
   // ── Form ────────────────────────────────────────────────────────
   return (
     <PageLayout>
+      {/* Mobile recommendation card - first page content */}
+      {isMobile && (
+        <div
+          style={{
+            background: '#f9f9f7',
+            padding: '12px 16px 0',
+          }}
+        >
+          {renderRecommendationCard()}
+        </div>
+      )}
+
       {/* Hero */}
       <div className="page-hero">
         <div className="container">
@@ -270,31 +516,103 @@ function OfferSubmitContent() {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
-            {/* ── Section 1: Business ── */}
-            <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '36px', marginBottom: 2 }}>
-              <div className="section-label" style={{ marginBottom: 24 }}>1. Your Business</div>
+            {/* ── Section 1: Business Category ── */}
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #e2e0d8',
+                padding: '36px',
+                marginBottom: 2,
+              }}
+            >
+              <div
+                className="section-label"
+                style={{ marginBottom: 24 }}
+              >
+                1. Business Category
+              </div>
 
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                    color: '#2a2820',
+                  }}
+                >
+                  Select Your Business Category *
+                </label>
+
+                <select
+                  className="select-field"
+                  value={form.category}
+                  onChange={e => handleChange('category', e.target.value)}
+                  disabled={atLimit}
+                  style={{ margin: 0 }}
+                >
+                  {offerCategories.map(category => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#9a9585',
+                    marginTop: 7,
+                    fontFamily: 'Noto Serif, serif',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Choose the category that best matches your business. Your recommended
+                  discount presets will update based on this selection.
+                </div>
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                    color: '#2a2820',
+                  }}
+                >
                   Business Name *
                 </label>
+
                 <input
                   className="input-field"
                   value={form.businessName}
                   onChange={e => handleChange('businessName', e.target.value)}
                   placeholder="Your business or company name"
                   disabled={atLimit}
+                  style={{ margin: 0 }}
                 />
-                {errors.businessName && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif' }}>{errors.businessName}</div>}
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
-                  Category *
-                </label>
-                <select className="select-field" value={form.category} onChange={e => handleChange('category', e.target.value)} disabled={atLimit}>
-                  {offerCategories.map(c => <option key={c}>{c}</option>)}
-                </select>
+                {errors.businessName && (
+                  <div
+                    style={{
+                      color: '#c0392b',
+                      fontSize: '12px',
+                      marginTop: 6,
+                      fontFamily: 'DM Sans, sans-serif',
+                    }}
+                  >
+                    {errors.businessName}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -319,14 +637,210 @@ function OfferSubmitContent() {
                       transition: 'all 0.2s',
                     }}
                   >
-                    <div style={{ color: form.type === opt.value ? '#9b7011' : '#9a9585', marginBottom: 8 }}>{opt.icon}</div>
-                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '14px', color: '#2a2820', marginBottom: 4 }}>{opt.label}</div>
-                    <div style={{ fontFamily: 'Noto Serif, serif', color: '#9a9585', fontSize: '12px', lineHeight: 1.5 }}>{opt.hint}</div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: form.type === opt.value ? '#9b7011' : '#9a9585',
+                        }}
+                      >
+                        {opt.icon}
+                      </div>
+
+                      {opt.popular && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '3px 8px',
+                            background: '#e7b605',
+                            color: '#000',
+                            borderRadius: 999,
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          ★ Most Popular
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        color: '#2a2820',
+                        marginBottom: 4,
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#9a9585',
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {opt.hint}
+                    </div>
                   </button>
                 ))}
               </div>
 
               {/* Discount value input */}
+
+              {/* Desktop recommendation card */}
+              {!isMobile && renderRecommendationCard()}
+
+              {/* Category-based discount presets */}
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-end',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        color: '#2a2820',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Recommended Discounts
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#9a9585',
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Suggested options for {form.category}.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {currentDiscountPresets.map(preset => {
+                    const isSelected =
+                      form.type === 'percentage' &&
+                      form.discountValue === preset.value;
+
+                    return (
+                      <label
+                        key={`${form.category}-${preset.value}`}
+                        style={{
+                          position: 'relative',
+                          display: 'block',
+                          padding: '20px',
+                          border: '2px solid',
+                          borderColor: isSelected ? '#e7b605' : '#e2e0d8',
+                          background: isSelected
+                            ? 'rgba(231,182,5,0.07)'
+                            : '#fff',
+                          cursor: atLimit ? 'not-allowed' : 'pointer',
+                          opacity: atLimit ? 0.5 : 1,
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="recommendedDiscount"
+                          value={preset.value}
+                          checked={isSelected}
+                          disabled={atLimit}
+                          onChange={() => selectDiscountPreset(preset.value)}
+                          style={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            width: 17,
+                            height: 17,
+                            accentColor: '#e7b605',
+                            cursor: atLimit ? 'not-allowed' : 'pointer',
+                          }}
+                        />
+
+                        <div
+                          style={{
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontWeight: 900,
+                            fontSize: '28px',
+                            lineHeight: 1,
+                            color: isSelected ? '#9b7011' : '#2a2820',
+                            marginBottom: 10,
+                            paddingRight: 24,
+                          }}
+                        >
+                          {preset.label}
+                        </div>
+
+                        <div
+                          style={{
+                            fontFamily: 'Noto Serif, serif',
+                            color: '#9a9585',
+                            fontSize: '12px',
+                            lineHeight: 1.55,
+                          }}
+                        >
+                          {preset.description}
+                        </div>
+
+                        {isSelected && (
+                          <div
+                            style={{
+                              marginTop: 12,
+                              fontFamily: 'DM Sans, sans-serif',
+                              color: '#9b7011',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              letterSpacing: '0.07em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Selected
+                          </div>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               {(form.type === 'percentage' || form.type === 'fixed') && (
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>

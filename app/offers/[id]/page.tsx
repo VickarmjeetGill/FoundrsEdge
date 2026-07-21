@@ -7,9 +7,9 @@ import type { Offer } from '../page';
 
 const typeColors: Record<Offer['type'], { bg: string; color: string; icon: React.ReactNode; label: string }> = {
   percentage: { bg: 'rgba(231,182,5,0.12)', color: '#9b7011', icon: <Percent size={13} />, label: 'Percentage Off' },
-  bogo:       { bg: 'rgba(39,174,96,0.1)',  color: '#27ae60', icon: <Gift size={13} />,    label: 'Buy One Get One Free' },
-  fixed:      { bg: 'rgba(26,111,196,0.1)', color: '#1a6fc4', icon: <Tag size={13} />,     label: 'Fixed Amount Off' },
-  custom:     { bg: 'rgba(90,58,8,0.08)',   color: '#5a3a08', icon: <Zap size={13} />,     label: 'Custom Offer' },
+  bogo: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', icon: <Gift size={13} />, label: 'Buy One Get One Free' },
+  fixed: { bg: 'rgba(26,111,196,0.1)', color: '#1a6fc4', icon: <Tag size={13} />, label: 'Fixed Amount Off' },
+  custom: { bg: 'rgba(90,58,8,0.08)', color: '#5a3a08', icon: <Zap size={13} />, label: 'Custom Offer' },
 };
 
 function isExpired(dateStr: string) {
@@ -33,7 +33,7 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
           const mappedOffer: Offer = {
             id: o.id,
             businessName: o.business_name,
-            businessId: o.business_id,
+            businessId: o.business_directory_id,
             title: o.title,
             type: o.type,
             discount: o.type === 'percentage' ? `${o.discount_value}% off` : o.type === 'fixed' ? `$${o.discount_value} off` : o.type === 'bogo' ? 'Buy 1 Get 1 Free' : o.discount_value || o.fe_discount || 'Special Offer',
@@ -181,10 +181,250 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
         <div className="container">
           <div className="grid-halves" style={{ alignItems: 'start' }}>
             {/* Left: Details */}
+            {/* Left: Details */}
             <div>
+              {/* Structured discount terms */}
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e2e0d8',
+                  borderTop: '4px solid #e7b605',
+                  padding: '28px',
+                  marginBottom: 40,
+                }}
+              >
+                <div
+                  className="section-label"
+                  style={{ marginBottom: 20 }}
+                >
+                  Discount Terms
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: 20,
+                  }}
+                >
+                  {/* Discount value */}
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9a9585',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Discount
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#e7b605',
+                        fontSize: '24px',
+                        fontWeight: 900,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {offer.discount}
+                    </div>
+                  </div>
+
+                  {/* Offer type */}
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9a9585',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Offer Type
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: typeInfo.color,
+                        fontSize: '14px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {typeInfo.icon}
+                      {typeInfo.label}
+                    </div>
+                  </div>
+
+                  {/* Expiry date */}
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9a9585',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Valid Until
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: expired ? '#c0392b' : '#2a2820',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {offer.expiryDate
+                        ? new Date(offer.expiryDate).toLocaleDateString('en-CA', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                        : 'No expiry date provided'}
+                      {expired ? ' — Expired' : ''}
+                    </div>
+                  </div>
+
+                  {/* Location */}
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9a9585',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Available At
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#2a2820',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <MapPin size={14} style={{ color: '#e7b605' }} />
+                      {offer.location || 'Location not specified'}
+                    </div>
+                  </div>
+                </div>
+
+                {offer.foundersEdgeDiscount && (
+                  <div
+                    style={{
+                      marginTop: 24,
+                      paddingTop: 20,
+                      borderTop: '1px solid #e2e0d8',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9a9585',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      Founders Edge Member Terms
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#5a5650',
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {offer.foundersEdgeDiscount}
+                    </div>
+                  </div>
+                )}
+
+                {offer.howToRedeem && (
+                  <div
+                    style={{
+                      marginTop: 20,
+                      padding: '16px 18px',
+                      background: '#f9f9f7',
+                      borderLeft: '3px solid #e7b605',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: 'DM Sans, sans-serif',
+                        color: '#9b7011',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      How to Redeem
+                    </div>
+
+                    <div
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#5a5650',
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {offer.howToRedeem}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
               <div style={{ marginBottom: 40 }}>
-                <div className="section-label" style={{ marginBottom: 20 }}>About This Offer</div>
-                <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '16px', lineHeight: 1.8 }}>
+                <div
+                  className="section-label"
+                  style={{ marginBottom: 20 }}
+                >
+                  About This Offer
+                </div>
+
+                <p
+                  style={{
+                    fontFamily: 'Noto Serif, serif',
+                    color: '#5a5650',
+                    fontSize: '16px',
+                    lineHeight: 1.8,
+                  }}
+                >
                   {offer.description}
                 </p>
               </div>

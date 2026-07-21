@@ -77,17 +77,40 @@ type MyOffer = {
   discount: string;
   category: string;
   type: string;
+  template?: string;
   expiryDate?: string;
   submittedAt: string;
   updatedAt?: string;
   status: 'pending' | 'approved' | 'rejected';
 };
+
+const offerTemplateLabels: Record<string, string> = {
+  percentage: 'Percentage Discount',
+  fixed: 'Fixed Amount Discount',
+  bogo: 'Buy One Get One',
+  custom: 'Custom Offer',
+  passport: 'Passport Offer',
+  event: 'Event Offer',
+  affiliate: 'Affiliate Offer',
+};
+
+
+
+
 const statusStyles: Record<'pending' | 'approved' | 'rejected' | 'archived', { bg: string; color: string; label: string }> = {
   pending: { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
   approved: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', label: 'Approved' },
   rejected: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Rejected' },
   archived: { bg: 'rgba(90,86,80,0.1)', color: '#5a5650', label: 'Archived' },
 };
+
+function formatOfferTemplate(template?: string) {
+  if (!template) return 'Standard Offer';
+
+  return template
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+}
 
 const sectionTitles: Record<Section, string> = {
   dashboard: 'Dashboard',
@@ -348,12 +371,12 @@ function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
         {recommendations.matches.map((match, idx) => (
-          <div 
-            key={idx} 
-            style={{ 
-              background: '#fff', 
-              border: '1px solid #e2e0d8', 
-              borderRadius: '8px', 
+          <div
+            key={idx}
+            style={{
+              background: '#fff',
+              border: '1px solid #e2e0d8',
+              borderRadius: '8px',
               padding: '24px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
               display: 'flex',
@@ -399,7 +422,7 @@ function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
               <span style={{ fontSize: '11px', color: '#9a9585', fontWeight: 600 }}>
                 {match.mutual} Mutual Connection{match.mutual !== 1 ? 's' : ''}
               </span>
-              <button 
+              <button
                 onClick={() => {
                   setConfirmModal({
                     isOpen: true,
@@ -725,6 +748,10 @@ export default function DashboardPage() {
   const [completedStepIds, setCompletedStepIds] = useState<string[]>([]);
   const [roadmapLoading, setRoadmapLoading] = useState(true);
 
+  const [showStepCongratulations, setShowStepCongratulations] = useState(false);
+  const [completingStepId, setCompletingStepId] = useState<string | null>(null);
+  const [dismissedStepIds, setDismissedStepIds] = useState<string[]>([]);
+
   const loadRoadmap = async () => {
     try {
       const res = await getRoadmap();
@@ -740,63 +767,44 @@ export default function DashboardPage() {
   };
 
   const handleToggleWidgetStep = async (stepId: string) => {
-    const isCompleted = completedStepIds.includes(stepId);
-    
-    // Optimistic update
-    if (isCompleted) {
-      setCompletedStepIds(prev => prev.filter(id => id !== stepId));
-    } else {
-      setCompletedStepIds(prev => [...prev, stepId]);
-    }
 
-    try {
-      const res = await toggleStepCompletion(stepId, !isCompleted);
-      if (!res.success) {
-        loadRoadmap();
+    const [confirmModal, setConfirmModal] = useState<{
+      isOpen: boolean;
+      title: string;
+      message: string;
+      onConfirm: () => void;
+    }>({
+      isOpen: false,
+      title: '',
+      message: '',
+      onConfirm: () => { },
+    });
+
+    useEscapeKey(confirmModal.isOpen, () => setConfirmModal(prev => ({ ...prev, isOpen: false })));
+
+    const loadProfile = async () => {
+      const res = await getProfile();
+
+      if (!res.success || !res.user) {
+        router.push('/login');
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      loadRoadmap();
-    }
-  };
 
-  const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => { },
-  });
+      const loggedInUser = res.user as any;
 
-  useEscapeKey(confirmModal.isOpen, () => setConfirmModal(prev => ({ ...prev, isOpen: false })));
+      setUserProfile(loggedInUser);
 
-  const loadProfile = async () => {
-    const res = await getProfile();
+      if (loggedInUser.role === 'MEMBER' && !loggedInUser.track) {
+        router.push('/onboarding');
+        return;
+      }
 
-    if (!res.success || !res.user) {
-      router.push('/login');
-      return;
-    }
+      const userEmail = loggedInUser.email || '';
+      const userName = loggedInUser.name || 'Member';
 
-    const loggedInUser = res.user as any;
-
-    setUserProfile(loggedInUser);
-
-    if (loggedInUser.role === 'MEMBER' && !loggedInUser.track) {
-      router.push('/onboarding');
-      return;
-    }
-
-    const userEmail = loggedInUser.email || '';
-    const userName = loggedInUser.name || 'Member';
-
-    const { data, error } = await supabase
-      .from('members')
-      .select(`
+      const { data, error } = await supabase
+        .from('members')
+        .select(`
           id,
           first_name,
           last_name,
@@ -809,1029 +817,1134 @@ export default function DashboardPage() {
             business_type
           )
         `)
-      .eq('email', userEmail)
-      .maybeSingle();
+        .eq('email', userEmail)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Member/business lookup error:', error.message);
-    }
+      if (error) {
+        console.error('Member/business lookup error:', error.message);
+      }
 
-    if (data) {
-      const businessData = Array.isArray(data.businesses)
-        ? data.businesses[0]
-        : data.businesses;
+      if (data) {
+        const businessData = Array.isArray(data.businesses)
+          ? data.businesses[0]
+          : data.businesses;
 
-      const fullName = `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() || userName;
-      const industry = data.industry ?? businessData?.business_type ?? 'Member';
+        const fullName = `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() || userName;
+        const industry = data.industry ?? businessData?.business_type ?? 'Member';
 
-      setMember({
-        name: fullName,
-        business: businessData?.business_name ?? 'Founders Edge Member',
-        industry,
-        stage: data.stage ?? '',
-        joined: data.created_at
-          ? new Date(data.created_at).toLocaleDateString('en-US', {
-            month: 'short',
-            year: 'numeric',
-          })
-          : 'May 2026',
-        profileCompletion: computeProfileCompletion({
+        setMember({
           name: fullName,
-          email: userEmail,
+          business: businessData?.business_name ?? 'Founders Edge Member',
           industry,
-          stage: data.stage,
-          avatarUrl: loggedInUser.avatarUrl,
-        }).percent,
-      });
+          stage: data.stage ?? '',
+          joined: data.created_at
+            ? new Date(data.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              year: 'numeric',
+            })
+            : 'May 2026',
+          profileCompletion: computeProfileCompletion({
+            name: fullName,
+            email: userEmail,
+            industry,
+            stage: data.stage,
+            avatarUrl: loggedInUser.avatarUrl,
+          }).percent,
+        });
 
-      await loadSubmissions(data.id);
-      return;
-    }
-
-    setMember(prev => ({
-      ...prev,
-      name: userName,
-      business: 'Founders Edge Member',
-      industry: 'Member',
-      profileCompletion: computeProfileCompletion({
-        name: userName,
-        email: userEmail,
-        avatarUrl: loggedInUser.avatarUrl,
-      }).percent,
-    }));
-
-    await loadSubmissions();
-  };
-
-  // Check auth status on every tab/section transition within the dashboard
-  useEffect(() => {
-    const verifyAuth = async () => {
-      const res = await getProfile();
-      if (!res.success || !res.user) {
-        router.push('/login');
+        await loadSubmissions(data.id);
         return;
       }
-      if (res.user.role === 'MEMBER' && !res.user.track) {
-        router.push('/onboarding');
-      }
+
+      setMember(prev => ({
+        ...prev,
+        name: userName,
+        business: 'Founders Edge Member',
+        industry: 'Member',
+        profileCompletion: computeProfileCompletion({
+          name: userName,
+          email: userEmail,
+          avatarUrl: loggedInUser.avatarUrl,
+        }).percent,
+      }));
+
+      await loadSubmissions();
     };
-    verifyAuth();
-  }, [activeSection, router]);
 
-  const loadSubmissions = async (memberId?: string) => {
-    if (!memberId) {
-      const raw = localStorage.getItem('fe_my_submissions');
-      if (raw) {
-        try {
-          setMySubmissions(JSON.parse(raw));
-        } catch { }
-      }
-      return;
-    }
+    const handleDismissWidgetStep = (stepId: string) => {
+      if (completingStepId) return;
 
-    try {
-      const res = await fetch('/api/events?mySubmissions=true');
+      setDismissedStepIds(prev =>
+        prev.includes(stepId) ? prev : [...prev, stepId]
+      );
+    };
 
-      if (res.ok) {
-        const allEvents = await res.json();
-        const mine = allEvents.filter((e: any) => e.member_id === memberId);
-
-        const mapped: Submission[] = mine.map((e: any) => ({
-          id: e.id,
-          title: e.title,
-          category: e.category,
-          submittedAt: e.created_At || e.created_at || new Date().toISOString(),
-          status: e.status?.toLowerCase() || 'pending',
-        }));
-
-        setMySubmissions(mapped);
-      }
-    } catch (err) {
-      console.error('Failed to load submissions from API:', err);
-    }
-  };
-
-  const loadOffers = async () => {
-    try {
-      const res = await fetch('/api/offers?mySubmissions=true');
-      if (res.ok) {
-        const dbData = await res.json();
-        const mapped: MyOffer[] = dbData.map((o: any) => ({
-          id: o.id,
-          title: o.title,
-          discount: o.type === 'percentage' ? `${o.discount_value}% off` : o.type === 'fixed' ? `$${o.discount_value} off` : o.type === 'bogo' ? 'Buy 1 Get 1 Free' : o.discount_value || o.fe_discount || 'Special Offer',
-          category: o.category,
-          type: o.type,
-          expiryDate: o.expiry_date,
-          submittedAt: o.created_at || o.created_At || new Date().toISOString(),
-          status: o.status.toLowerCase() as any,
-        }));
-        setMyOffers(mapped);
-      }
-    } catch (err) {
-      console.error('Failed to load offers from API:', err);
-    }
-  };
-
-  const loadNominations = async () => {
-    try {
-      const queryParams = new URLSearchParams({
-        page: nomPage.toString(),
-        limit: itemPerPage.toString(),
-      });
-
-      const res = await fetch(`/api/nominations?${queryParams.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-
-        const dbNoms = Array.isArray(data) ? data : (data.nominations || []);
-        if (data.pagination) {
-          setNomTotalPages(data.pagination.totalPages);
-        } else {
-          setNomTotalPages(1);
+    // Check auth status on every tab/section transition within the dashboard
+    useEffect(() => {
+      const verifyAuth = async () => {
+        const res = await getProfile();
+        if (!res.success || !res.user) {
+          router.push('/login');
+          return;
         }
+        if (res.user.role === 'MEMBER' && !res.user.track) {
+          router.push('/onboarding');
+        }
+      };
+      verifyAuth();
+    }, [activeSection, router]);
 
-        const mapped: Nomination[] = dbNoms.map((n: any) => ({
-          id: n.id,
-          awardId: n.award_id,
-          awardName: n.award?.name || 'Unknown Award',
-          awardOrg: n.award?.org || '',
-          businessName: n.business_name,
-          category: n.award?.category || '',
-          contactName: n.contact_name,
-          contactEmail: n.contact_email,
-          website: n.website || '',
-          achievement: n.achievement,
-          statement: n.statement,
-          status: n.status.toLowerCase() as any,
-          submittedAt: n.created_at,
-        }));
-        setMyNominations(mapped);
-      }
-    } catch (err) {
-      console.error('Failed to load nominations from API:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadProfile();
-    loadOffers();
-    loadRoadmap();
-
-    // Parse tab parameter from query string if present
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab && ['dashboard', 'feed', 'events', 'offers', 'awards', 'business', 'owners', 'roadmap', 'matches'].includes(tab)) {
-        setActiveSection(tab as Section);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    loadNominations();
-  }, [nomPage]);
-
-  // Recompute profile completion when switching sections (picks up business/owner
-  // profile edits made in the Business/Owners tabs without needing a reload).
-  useEffect(() => {
-    setMember(prev => ({
-      ...prev,
-      profileCompletion: computeProfileCompletion({
-        name: prev.name,
-        email: userProfile?.email,
-        industry: prev.industry,
-        stage: prev.stage,
-        avatarUrl: userProfile?.avatarUrl,
-      }).percent,
-    }));
-  }, [activeSection, userProfile]);
-
-  async function deleteSubmission(id: string) {
-    try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        const updated = mySubmissions.filter(s => s.id !== id);
-        setMySubmissions(updated);
+    const loadSubmissions = async (memberId?: string) => {
+      if (!memberId) {
         const raw = localStorage.getItem('fe_my_submissions');
         if (raw) {
           try {
-            const list = JSON.parse(raw).filter((s: any) => s.id !== id);
-            localStorage.setItem('fe_my_submissions', JSON.stringify(list));
+            setMySubmissions(JSON.parse(raw));
           } catch { }
         }
-      } else {
-        const data = await res.json();
-        alert(`Error deleting event: ${data.error || 'Unknown error'}`);
+        return;
       }
-    } catch (err) {
-      console.error("Failed to delete event:", err);
-      alert("Failed to delete event due to network error.");
-    }
-  }
 
-  async function deleteOffer(id: string) {
-    try {
-      const res = await fetch(`/api/offers/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setMyOffers(prev => prev.filter(o => o.id !== id));
-      } else {
-        const data = await res.json();
-        alert(`Error deleting offer: ${data.error || 'Unknown error'}`);
+      try {
+        const res = await fetch('/api/events?mySubmissions=true');
+
+        if (res.ok) {
+          const allEvents = await res.json();
+          const mine = allEvents.filter((e: any) => e.member_id === memberId);
+
+          const mapped: Submission[] = mine.map((e: any) => ({
+            id: e.id,
+            title: e.title,
+            category: e.category,
+            submittedAt: e.created_At || e.created_at || new Date().toISOString(),
+            status: e.status?.toLowerCase() || 'pending',
+          }));
+
+          setMySubmissions(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load submissions from API:', err);
       }
-    } catch (err) {
-      console.error("Failed to delete offer:", err);
-      alert("Failed to delete offer due to network error.");
-    }
-  }
-
-  async function deleteNomination(id: string) {
-    try {
-      const res = await fetch(`/api/nominations/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setMyNominations(prev => prev.filter(n => n.id !== id));
-      } else {
-        const data = await res.json();
-        alert(`Error deleting nomination: ${data.error || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error("Failed to delete nomination:", err);
-      alert("Failed to delete nomination due to network error.");
-    }
-  }
-
-  // ── Sidebar nav item renderer ──────────────────────────────────
-  function NavItem({ item }: { item: typeof navItems[0] }) {
-    const isActive = item.section === activeSection;
-    const sharedStyle: React.CSSProperties = {
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 24px',
-      background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent',
-      borderLeft: isActive ? '3px solid #e7b605' : '3px solid transparent',
-      color: isActive ? '#e7b605' : '#888',
-      fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px',
-      letterSpacing: '0.03em', transition: 'all 0.2s', width: '100%',
-      textDecoration: 'none',
     };
 
-    if (item.section) {
+    const loadOffers = async () => {
+      try {
+        const res = await fetch('/api/offers?mySubmissions=true');
+        if (res.ok) {
+          const dbData = await res.json();
+          const mapped: MyOffer[] = dbData.map((o: any) => ({
+            id: o.id,
+            title: o.title,
+            discount: o.type === 'percentage' ? `${o.discount_value}% off` : o.type === 'fixed' ? `$${o.discount_value} off` : o.type === 'bogo' ? 'Buy 1 Get 1 Free' : o.discount_value || o.fe_discount || 'Special Offer',
+            category: o.category,
+            type: o.type,
+            template: o.passport_type || o.type || 'Standard Offer',
+            expiryDate: o.expiry_date,
+            submittedAt: o.created_at || o.created_At || new Date().toISOString(),
+            status: o.status.toLowerCase() as any,
+          }));
+          setMyOffers(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load offers from API:', err);
+      }
+    };
+
+    const loadNominations = async () => {
+      try {
+        const queryParams = new URLSearchParams({
+          page: nomPage.toString(),
+          limit: itemPerPage.toString(),
+        });
+
+        const res = await fetch(`/api/nominations?${queryParams.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+
+          const dbNoms = Array.isArray(data) ? data : (data.nominations || []);
+          if (data.pagination) {
+            setNomTotalPages(data.pagination.totalPages);
+          } else {
+            setNomTotalPages(1);
+          }
+
+          const mapped: Nomination[] = dbNoms.map((n: any) => ({
+            id: n.id,
+            awardId: n.award_id,
+            awardName: n.award?.name || 'Unknown Award',
+            awardOrg: n.award?.org || '',
+            businessName: n.business_name,
+            category: n.award?.category || '',
+            contactName: n.contact_name,
+            contactEmail: n.contact_email,
+            website: n.website || '',
+            achievement: n.achievement,
+            statement: n.statement,
+            status: n.status.toLowerCase() as any,
+            submittedAt: n.created_at,
+          }));
+          setMyNominations(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load nominations from API:', err);
+      }
+    };
+
+    useEffect(() => {
+      loadProfile();
+      loadOffers();
+      loadRoadmap();
+
+      // Parse tab parameter from query string if present
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab && ['dashboard', 'feed', 'events', 'offers', 'awards', 'business', 'owners', 'roadmap', 'matches'].includes(tab)) {
+          setActiveSection(tab as Section);
+        }
+      }
+    }, []);
+
+    useEffect(() => {
+      loadNominations();
+    }, [nomPage]);
+
+    // Recompute profile completion when switching sections (picks up business/owner
+    // profile edits made in the Business/Owners tabs without needing a reload).
+    useEffect(() => {
+      setMember(prev => ({
+        ...prev,
+        profileCompletion: computeProfileCompletion({
+          name: prev.name,
+          email: userProfile?.email,
+          industry: prev.industry,
+          stage: prev.stage,
+          avatarUrl: userProfile?.avatarUrl,
+        }).percent,
+      }));
+    }, [activeSection, userProfile]);
+
+    async function deleteSubmission(id: string) {
+      try {
+        const res = await fetch(`/api/events/${id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          const updated = mySubmissions.filter(s => s.id !== id);
+          setMySubmissions(updated);
+          const raw = localStorage.getItem('fe_my_submissions');
+          if (raw) {
+            try {
+              const list = JSON.parse(raw).filter((s: any) => s.id !== id);
+              localStorage.setItem('fe_my_submissions', JSON.stringify(list));
+            } catch { }
+          }
+        } else {
+          const data = await res.json();
+          alert(`Error deleting event: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error("Failed to delete event:", err);
+        alert("Failed to delete event due to network error.");
+      }
+    }
+
+    async function deleteOffer(id: string) {
+      try {
+        const res = await fetch(`/api/offers/${id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          setMyOffers(prev => prev.filter(o => o.id !== id));
+        } else {
+          const data = await res.json();
+          alert(`Error deleting offer: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error("Failed to delete offer:", err);
+        alert("Failed to delete offer due to network error.");
+      }
+    }
+
+    async function deleteNomination(id: string) {
+      try {
+        const res = await fetch(`/api/nominations/${id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          setMyNominations(prev => prev.filter(n => n.id !== id));
+        } else {
+          const data = await res.json();
+          alert(`Error deleting nomination: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error("Failed to delete nomination:", err);
+        alert("Failed to delete nomination due to network error.");
+      }
+    }
+
+    // ── Sidebar nav item renderer ──────────────────────────────────
+    function NavItem({ item }: { item: typeof navItems[0] }) {
+      const isActive = item.section === activeSection;
+      const sharedStyle: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 24px',
+        background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent',
+        borderLeft: isActive ? '3px solid #e7b605' : '3px solid transparent',
+        color: isActive ? '#e7b605' : '#888',
+        fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px',
+        letterSpacing: '0.03em', transition: 'all 0.2s', width: '100%',
+        textDecoration: 'none',
+      };
+
+      if (item.section) {
+        return (
+          <button
+            onClick={() => { setActiveSection(item.section!); setSidebarOpen(false); }}
+            style={{ ...sharedStyle, background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+          >
+            <item.icon size={16} />
+            {item.label}
+          </button>
+        );
+      }
+
       return (
-        <button
-          onClick={() => { setActiveSection(item.section!); setSidebarOpen(false); }}
-          style={{ ...sharedStyle, background: isActive ? 'rgba(231,182,5,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-        >
+        <Link href={item.href!} style={sharedStyle}>
           <item.icon size={16} />
           {item.label}
-        </button>
+          <ExternalLink size={11} style={{ marginLeft: 'auto', opacity: 0.4 }} />
+        </Link>
       );
     }
 
-    return (
-      <Link href={item.href!} style={sharedStyle}>
-        <item.icon size={16} />
-        {item.label}
-        <ExternalLink size={11} style={{ marginLeft: 'auto', opacity: 0.4 }} />
-      </Link>
-    );
-  }
-
-  // ── Section: Events ────────────────────────────────────────────
-  function EventsSection() {
-    return (
-      <div style={{ padding: '40px' }}>
-        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Event Submissions</h2>
-              <div style={{ fontSize: '13px', color: '#9a9585' }}>{mySubmissions.length} submission{mySubmissions.length !== 1 ? 's' : ''}</div>
-            </div>
-            <Link href="/events/submit" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-              <Plus size={14} /> Submit New Event
-            </Link>
-          </div>
-
-          {mySubmissions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
-              <Calendar size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No event submissions yet</div>
-              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-                Have an event for the Founders Edge community? Submit it for review and it'll appear here once approved.
+    // ── Section: Events ────────────────────────────────────────────
+    function EventsSection() {
+      return (
+        <div style={{ padding: '40px' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Event Submissions</h2>
+                <div style={{ fontSize: '13px', color: '#9a9585' }}>{mySubmissions.length} submission{mySubmissions.length !== 1 ? 's' : ''}</div>
               </div>
-              <Link href="/events/submit" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
-                Submit an Event
+              <Link href="/events/submit" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+                <Plus size={14} /> Submit New Event
               </Link>
             </div>
-          ) : (
-            <div>
-              {mySubmissions.map(sub => {
-                const s = statusStyles[sub.status];
-                const canEdit = sub.status !== 'approved';
-                return (
-                  <div key={sub.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 6 }}>{sub.title}</div>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{sub.category}</span>
-                        <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                          Submitted {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        {sub.updatedAt && (
-                          <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                            · Updated {new Date(sub.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {s.label}
-                      </span>
-                      {canEdit && (
-                        <Link
-                          href={`/events/submit?edit=${sub.id}`}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
-                        >
-                          <Pencil size={12} /> Edit
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => {
-                          setConfirmModal({
-                            isOpen: true,
-                            title: 'Delete Submission',
-                            message: 'Are you sure you want to permanently delete this event submission?',
-                            onConfirm: () => deleteSubmission(sub.id),
-                          });
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'transparent', border: '1px solid #e2e0d8', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#c0392b'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#9a9585'; }}
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Browse events link */}
-        <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-          <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Browse all upcoming Founders Edge events</div>
-          <Link href="/events" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-            View All Events <ExternalLink size={13} />
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Section: Offers ────────────────────────────────────────────
-  function OffersSection() {
-    const activeCount = myOffers.filter(o => o.status !== 'rejected').length;
-    return (
-      <div style={{ padding: '40px' }}>
-        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Offer Submissions</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: '13px', color: '#9a9585' }}>{activeCount}/3 active offers</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} style={{ width: 20, height: 5, background: i < activeCount ? '#e7b605' : '#e2e0d8', borderRadius: 2 }} />
-                  ))}
+            {mySubmissions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
+                <Calendar size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No event submissions yet</div>
+                <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
+                  Have an event for the Founders Edge community? Submit it for review and it'll appear here once approved.
                 </div>
+                <Link href="/events/submit" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
+                  Submit an Event
+                </Link>
               </div>
-            </div>
-            {activeCount < 3 && (
-              <Link href="/offers/submit" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-                <Plus size={14} /> Add Offer
-              </Link>
-            )}
-          </div>
-
-          {myOffers.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
-              <Tag size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No offers yet</div>
-              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-                Share exclusive deals with the Founders Edge community. Members can list up to 3 active offers.
-              </div>
-              <Link href="/offers/submit" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
-                Share an Offer
-              </Link>
-            </div>
-          ) : (
-            <div>
-              {myOffers.map(offer => {
-                const s = statusStyles[offer.status];
-                const canEdit = offer.status !== 'approved';
-                const isExpired = offer.expiryDate && new Date(offer.expiryDate) < new Date();
-                return (
-                  <div key={offer.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span style={{ fontWeight: 900, fontSize: '20px', color: '#e7b605', fontFamily: 'DM Sans, sans-serif' }}>{offer.discount}</span>
-                        {isExpired && <span style={{ fontSize: '10px', fontWeight: 700, color: '#c0392b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Expired</span>}
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>{offer.title}</div>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{offer.category}</span>
-                        <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                          Submitted {new Date(offer.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        {offer.expiryDate && (
-                          <span style={{ fontSize: '12px', color: isExpired ? '#c0392b' : '#9a9585' }}>
-                            · Expires {new Date(offer.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            ) : (
+              <div>
+                {mySubmissions.map(sub => {
+                  const s = statusStyles[sub.status];
+                  const canEdit = sub.status !== 'approved';
+                  return (
+                    <div key={sub.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 6 }}>{sub.title}</div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{sub.category}</span>
+                          <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                            Submitted {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
-                        )}
+                          {sub.updatedAt && (
+                            <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                              · Updated {new Date(sub.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {s.label}
-                      </span>
-                      {canEdit && (
-                        <Link
-                          href={`/offers/submit?edit=${offer.id}`}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
-                        >
-                          <Pencil size={12} /> Edit
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => {
-                          setConfirmModal({
-                            isOpen: true,
-                            title: 'Delete Offer',
-                            message: 'Are you sure you want to delete this offer submission?',
-                            onConfirm: () => deleteOffer(offer.id),
-                          });
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'transparent', border: '1px solid #e2e0d8', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#c0392b'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#9a9585'; }}
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Browse offers link */}
-        <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-          <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Browse all member offers in the directory</div>
-          <Link href="/offers" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-            View All Offers <ExternalLink size={13} />
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Section: Awards ───────────────────────────────────────────
-  function AwardsSection() {
-    const nomStatusStyles: Record<Nomination['status'], { bg: string; color: string; label: string }> = {
-      pending: { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
-      approved: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', label: 'Approved' },
-      rejected: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Rejected' },
-      winner: { bg: 'rgba(231,182,5,0.12)', color: '#9b7011', label: '🏆 Winner!' },
-    };
-    return (
-      <div style={{ padding: '40px' }}>
-        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Award Nominations</h2>
-              <div style={{ fontSize: '13px', color: '#9a9585' }}>{myNominations.length} nomination{myNominations.length !== 1 ? 's' : ''} submitted</div>
-            </div>
-            <Link href="/awards" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-              <Trophy size={14} /> Browse Awards
-            </Link>
-          </div>
-
-          {myNominations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
-              <Trophy size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No nominations yet</div>
-              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-                Browse available awards and submit a nomination to get your business recognized.
-              </div>
-              <Link href="/awards" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
-                View Awards
-              </Link>
-            </div>
-          ) : (
-            <div>
-              {myNominations.map(nom => {
-                const s = nomStatusStyles[nom.status];
-                const isWinner = nom.status === 'winner';
-                return (
-                  <div key={nom.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ width: 40, height: 40, background: isWinner ? '#e7b605' : '#f0efe9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Trophy size={18} style={{ color: isWinner ? '#000' : '#9b7011' }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 4 }}>{nom.awardName}</div>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '13px', color: '#9b7011', fontWeight: 600 }}>{nom.awardOrg}</span>
-                        <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{nom.category}</span>
-                        <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                          Submitted {new Date(nom.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                        <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                          {s.label}
                         </span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                      <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {s.label}
-                      </span>
-                      {nom.status === 'pending' && (
-                        <Link
-                          href={`/awards/nominate?awardId=${nom.awardId}&edit=${nom.id}`}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
-                        >
-                          <Pencil size={12} /> Edit
-                        </Link>
-                      )}
-                      {nom.status !== 'winner' && (
+                        {canEdit && (
+                          <Link
+                            href={`/events/submit?edit=${sub.id}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
+                          >
+                            <Pencil size={12} /> Edit
+                          </Link>
+                        )}
                         <button
                           onClick={() => {
                             setConfirmModal({
                               isOpen: true,
-                              title: 'Withdraw Nomination',
-                              message: 'Are you sure you want to withdraw this nomination? This action cannot be undone.',
-                              onConfirm: () => deleteNomination(nom.id),
+                              title: 'Delete Submission',
+                              message: 'Are you sure you want to permanently delete this event submission?',
+                              onConfirm: () => deleteSubmission(sub.id),
                             });
                           }}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'transparent', border: '1px solid #e2e0d8', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#c0392b'; }}
                           onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#9a9585'; }}
                         >
-                          <Trash2 size={12} /> Withdraw
+                          <Trash2 size={12} /> Delete
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Browse events link */}
+          <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Browse all upcoming Founders Edge events</div>
+            <Link href="/events" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+              View All Events <ExternalLink size={13} />
+            </Link>
+          </div>
         </div>
+      );
+    }
 
-        {nomTotalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
-            <button
-              disabled={nomPage === 1}
-              onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
-                cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
-              }}
-            >
-              Prev
-            </button>
+    // ── Section: Offers ────────────────────────────────────────────
+    function OffersSection() {
+      const activeCount = myOffers.filter(o => o.status !== 'rejected').length;
+      return (
+        <div style={{ padding: '40px' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Offer Submissions</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: '13px', color: '#9a9585' }}>{activeCount}/3 active offers</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} style={{ width: 20, height: 5, background: i < activeCount ? '#e7b605' : '#e2e0d8', borderRadius: 2 }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {activeCount < 3 && (
+                <Link href="/offers/submit" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+                  <Plus size={14} /> Add Offer
+                </Link>
+              )}
+            </div>
 
-            {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
+            {myOffers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
+                <Tag size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No offers yet</div>
+                <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
+                  Share exclusive deals with the Founders Edge community. Members can list up to 3 active offers.
+                </div>
+                <Link href="/offers/submit" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
+                  Share an Offer
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {myOffers.map(offer => {
+                  const s = statusStyles[offer.status];
+                  const canEdit = offer.status !== 'approved';
+                  const isExpired = offer.expiryDate && new Date(offer.expiryDate) < new Date();
+                  return (
+                    <div key={offer.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                          <span style={{ fontWeight: 900, fontSize: '20px', color: '#e7b605', fontFamily: 'DM Sans, sans-serif' }}>{offer.discount}</span>
+                          {isExpired && <span style={{ fontSize: '10px', fontWeight: 700, color: '#c0392b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Expired</span>}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>{offer.title}</div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{offer.category}</span>
+                          <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                            Submitted {new Date(offer.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                          {offer.expiryDate && (
+                            <span style={{ fontSize: '12px', color: isExpired ? '#c0392b' : '#9a9585' }}>
+                              · Expires {new Date(offer.expiryDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          flexShrink: 0,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: '#f0efe9',
+                            color: '#5a5650',
+                            padding: '4px 12px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Template:{' '}
+                          {offerTemplateLabels[offer.template ?? ''] ??
+                            formatOfferTemplate(offer.template)}
+                        </span>
+
+                        <span
+                          style={{
+                            background: s.bg,
+                            color: s.color,
+                            padding: '4px 12px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {s.label}
+                        </span>
+                        {canEdit && (
+                          <Link
+                            href={`/offers/submit?edit=${offer.id}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
+                          >
+                            <Pencil size={12} /> Edit
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: 'Delete Offer',
+                              message: 'Are you sure you want to delete this offer submission?',
+                              onConfirm: () => deleteOffer(offer.id),
+                            });
+                          }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'transparent', border: '1px solid #e2e0d8', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#c0392b'; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#9a9585'; }}
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Browse offers link */}
+          <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Browse all member offers in the directory</div>
+            <Link href="/offers" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+              View All Offers <ExternalLink size={13} />
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Section: Awards ───────────────────────────────────────────
+    function AwardsSection() {
+      const nomStatusStyles: Record<Nomination['status'], { bg: string; color: string; label: string }> = {
+        pending: { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
+        approved: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', label: 'Approved' },
+        rejected: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Rejected' },
+        winner: { bg: 'rgba(231,182,5,0.12)', color: '#9b7011', label: '🏆 Winner!' },
+      };
+      return (
+        <div style={{ padding: '40px' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px', marginBottom: 4 }}>My Award Nominations</h2>
+                <div style={{ fontSize: '13px', color: '#9a9585' }}>{myNominations.length} nomination{myNominations.length !== 1 ? 's' : ''} submitted</div>
+              </div>
+              <Link href="/awards" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+                <Trophy size={14} /> Browse Awards
+              </Link>
+            </div>
+
+            {myNominations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
+                <Trophy size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>No nominations yet</div>
+                <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif', marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
+                  Browse available awards and submit a nomination to get your business recognized.
+                </div>
+                <Link href="/awards" className="btn-primary" style={{ justifyContent: 'center', display: 'inline-flex' }}>
+                  View Awards
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {myNominations.map(nom => {
+                  const s = nomStatusStyles[nom.status];
+                  const isWinner = nom.status === 'winner';
+                  return (
+                    <div key={nom.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                      <div style={{ width: 40, height: 40, background: isWinner ? '#e7b605' : '#f0efe9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Trophy size={18} style={{ color: isWinner ? '#000' : '#9b7011' }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 4 }}>{nom.awardName}</div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13px', color: '#9b7011', fontWeight: 600 }}>{nom.awardOrg}</span>
+                          <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{nom.category}</span>
+                          <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                            Submitted {new Date(nom.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                        <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                          {s.label}
+                        </span>
+                        {nom.status === 'pending' && (
+                          <Link
+                            href={`/awards/nominate?awardId=${nom.awardId}&edit=${nom.id}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', border: '1px solid #e2e0d8', color: '#555', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none', transition: 'all 0.2s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#e7b605'; e.currentTarget.style.color = '#9b7011'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#555'; }}
+                          >
+                            <Pencil size={12} /> Edit
+                          </Link>
+                        )}
+                        {nom.status !== 'winner' && (
+                          <button
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                title: 'Withdraw Nomination',
+                                message: 'Are you sure you want to withdraw this nomination? This action cannot be undone.',
+                                onConfirm: () => deleteNomination(nom.id),
+                              });
+                            }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: 'transparent', border: '1px solid #e2e0d8', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.color = '#c0392b'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.color = '#9a9585'; }}
+                          >
+                            <Trash2 size={12} /> Withdraw
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {nomTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 24, fontFamily: 'DM Sans, sans-serif' }}>
               <button
-                key={pageNum}
-                onClick={() => setNomPage(pageNum)}
+                disabled={nomPage === 1}
+                onClick={() => setNomPage(prev => Math.max(prev - 1, 1))}
                 style={{
-                  padding: '8px 14px', border: '1px solid',
-                  borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
-                  background: nomPage === pageNum ? '#e7b605' : '#fff',
-                  color: nomPage === pageNum ? '#fff' : '#2a2820',
-                  cursor: 'pointer', fontWeight: 700, fontSize: '12px'
+                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === 1 ? '#ccc' : '#2a2820',
+                  cursor: nomPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
                 }}
               >
-                {pageNum}
+                Prev
               </button>
-            ))}
 
-            <button
-              disabled={nomPage === nomTotalPages}
-              onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
-                border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
-                cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
-              }}
-            >
-              Next
-            </button>
+              {Array.from({ length: nomTotalPages }, (_, i) => i + 1).map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setNomPage(pageNum)}
+                  style={{
+                    padding: '8px 14px', border: '1px solid',
+                    borderColor: nomPage === pageNum ? '#e7b605' : '#e2e0d8',
+                    background: nomPage === pageNum ? '#e7b605' : '#fff',
+                    color: nomPage === pageNum ? '#fff' : '#2a2820',
+                    cursor: 'pointer', fontWeight: 700, fontSize: '12px'
+                  }}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                disabled={nomPage === nomTotalPages}
+                onClick={() => setNomPage(prev => Math.min(prev + 1, nomTotalPages))}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px',
+                  border: '1px solid #e2e0d8', background: '#fff', color: nomPage === nomTotalPages ? '#ccc' : '#2a2820',
+                  cursor: nomPage === nomTotalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '12px'
+                }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+
+
+          <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+            <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Discover all available awards and recognition opportunities</div>
+            <Link href="/awards" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
+              Browse All Awards <ExternalLink size={13} />
+            </Link>
           </div>
-        )}
+        </div >
+      );
+    }
 
+    // ── Section: Main Dashboard ────────────────────────────────────
+    function DashboardSection() {
+      const combinedItems = [
+        ...mySubmissions.slice(0, 3).map(item => ({
+          id: item.id,
+          type: 'event',
+          title: item.title,
+          subtitle: item.category,
+          date: item.submittedAt,
+          status: item.status,
+        })),
+        ...myOffers.slice(0, 3).map(item => ({
+          id: item.id,
+          type: 'offer',
+          title: item.title,
+          subtitle: item.category,
+          date: item.submittedAt,
+          status: item.status,
+        })),
+        ...dashboardPosts.slice(0, 3).map(item => ({
+          id: item.id,
+          type: 'post',
+          title: item.content,
+          subtitle: item.author_business || item.author_name || 'Community Post',
+          date: item.created_at,
+          status: 'active',
+        })),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        <div style={{ marginTop: 2, background: '#000', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-          <div style={{ color: '#888', fontFamily: 'Noto Serif, serif', fontSize: '14px' }}>Discover all available awards and recognition opportunities</div>
-          <Link href="/awards" className="btn-primary" style={{ fontSize: '12px', padding: '10px 18px' }}>
-            Browse All Awards <ExternalLink size={13} />
-          </Link>
-        </div>
-      </div >
-    );
-  }
+      const nextWidgetStep = roadmapSteps.find(
+        step =>
+          !completedStepIds.includes(step.id) &&
+          !dismissedStepIds.includes(step.id)
+      );
 
-  // ── Section: Main Dashboard ────────────────────────────────────
-  function DashboardSection() {
-    const combinedItems = [
-      ...mySubmissions.slice(0, 3).map(item => ({
-        id: item.id,
-        type: 'event',
-        title: item.title,
-        subtitle: item.category,
-        date: item.submittedAt,
-        status: item.status,
-      })),
-      ...myOffers.slice(0, 3).map(item => ({
-        id: item.id,
-        type: 'offer',
-        title: item.title,
-        subtitle: item.category,
-        date: item.submittedAt,
-        status: item.status,
-      })),
-      ...dashboardPosts.slice(0, 3).map(item => ({
-        id: item.id,
-        type: 'post',
-        title: item.content,
-        subtitle: item.author_business || item.author_name || 'Community Post',
-        date: item.created_at,
-        status: 'active',
-      })),
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    const nextWidgetStep = roadmapSteps.find(step => !completedStepIds.includes(step.id));
-
-    return (
-      <div style={{ padding: '40px' }}>
-        <div className="grid-4" style={{ gap: 2, marginBottom: 32 }}>
-          {[
-            { label: 'My Events', value: String(mySubmissions.length), change: 'Submitted events', icon: Calendar },
-            { label: 'My Offers', value: String(myOffers.length), change: 'Submitted offers', icon: Tag },
-            { label: 'Feed Posts', value: String(dashboardPosts.length), change: 'Recent community posts', icon: Rss },
-            { label: 'Awards', value: String(myNominations.length), change: 'My nominations', icon: Trophy },
-          ].map(stat => (
-            <div key={stat.label} style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                <stat.icon size={16} style={{ color: '#e7b605' }} />
+      return (
+        <div style={{ padding: '40px' }}>
+          <div className="grid-4" style={{ gap: 2, marginBottom: 32 }}>
+            {[
+              { label: 'My Events', value: String(mySubmissions.length), change: 'Submitted events', icon: Calendar },
+              { label: 'My Offers', value: String(myOffers.length), change: 'Submitted offers', icon: Tag },
+              { label: 'Feed Posts', value: String(dashboardPosts.length), change: 'Recent community posts', icon: Rss },
+              { label: 'Awards', value: String(myNominations.length), change: 'My nominations', icon: Trophy },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
+                  <stat.icon size={16} style={{ color: '#e7b605' }} />
+                </div>
+                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '32px', lineHeight: 1, marginBottom: 6 }}>{stat.value}</div>
+                <div style={{ fontSize: '12px', color: '#9a9585' }}>{stat.change}</div>
               </div>
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '32px', lineHeight: 1, marginBottom: 6 }}>{stat.value}</div>
-              <div style={{ fontSize: '12px', color: '#9a9585' }}>{stat.change}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Roadmap Widget: Your Next Step This Week */}
-        {!roadmapLoading && nextWidgetStep && (
-          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <Sparkles size={16} style={{ color: '#e7b605' }} />
-              <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Your Next Step This Week
-              </span>
-            </div>
-            <StepCard
-              weekNumber={nextWidgetStep.weekNumber}
-              title={nextWidgetStep.title}
-              description={nextWidgetStep.description}
-              actionText={nextWidgetStep.actionText}
-              actionHref={nextWidgetStep.actionHref}
-              completed={completedStepIds.includes(nextWidgetStep.id)}
-              onToggleComplete={() => handleToggleWidgetStep(nextWidgetStep.id)}
-            />
+            ))}
           </div>
-        )}
 
-        {/* Roadmap Widget: Congratulate if 100% complete */}
-        {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
-          <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Sparkles size={16} style={{ color: '#a16207' }} />
-                <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Roadmap Complete! 🏆
+          {/* Roadmap Widget: Your Next Step This Week */}
+          {!roadmapLoading && nextWidgetStep && (
+            <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <Sparkles size={16} style={{ color: '#e7b605' }} />
+                <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Your Next Step This Week
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: '13px', color: '#713f12', fontWeight: 600 }}>
-                You've completed all items on your current track! Ready to keep growing?
-              </p>
-            </div>
-            <button 
-              onClick={() => setActiveSection('roadmap')}
-              style={{
-                background: '#000',
-                border: '1px solid #000',
-                color: '#fff',
-                padding: '8px 16px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                fontWeight: 700,
-                fontFamily: 'DM Sans, sans-serif',
-                cursor: 'pointer'
-              }}
-            >
-              Switch Track
-            </button>
-          </div>
-        )}
+              {showStepCongratulations &&
+                completingStepId === nextWidgetStep.id ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    minHeight: 160,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    padding: '24px',
+                    background: 'rgba(39,174,96,0.06)',
+                    border: '1px solid rgba(39,174,96,0.25)',
+                    borderRadius: 6,
+                  }}
+                >
+                  <CheckCircle
+                    size={38}
+                    style={{
+                      color: '#27ae60',
+                      marginBottom: 12,
+                    }}
+                  />
 
-        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: 2 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4 }}>
-                Unified Home Dashboard
-              </h2>
-              <div style={{ fontSize: '13px', color: '#9a9585' }}>
-                Recent events, offers, and community posts in one place
-              </div>
-            </div>
-          </div>
-
-          {combinedItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
-              <Rss size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>
-                No recent activity yet
-              </div>
-              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif' }}>
-                Events, offers, and community posts will appear here once available.
-              </div>
-            </div>
-          ) : (
-            <div>
-              {combinedItems.map(item => (
-                <div key={`${item.type}-${item.id}`} style={{ padding: '18px 0', borderTop: '1px solid #f0efe9', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                      <span className="tag" style={{ fontSize: '10px', padding: '2px 8px', textTransform: 'uppercase' }}>
-                        {item.type}
-                      </span>
-                      <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                        {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>
-                      {item.title?.length > 90 ? item.title.slice(0, 90) + '…' : item.title}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#9a9585' }}>{item.subtitle}</div>
+                  <div
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontWeight: 900,
+                      fontSize: '20px',
+                      color: '#2a2820',
+                      marginBottom: 6,
+                    }}
+                  >
+                    Great work!
                   </div>
 
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#9b7011', textTransform: 'uppercase', flexShrink: 0 }}>
-                    {item.status}
-                  </span>
+                  <div
+                    style={{
+                      fontFamily: 'Noto Serif, serif',
+                      fontSize: '14px',
+                      lineHeight: 1.6,
+                      color: '#5a5650',
+                    }}
+                  >
+                    You completed this recommendation. Your next step is loading…
+                  </div>
                 </div>
-              ))}
+              ) : (
+                <StepCard
+                  weekNumber={nextWidgetStep.weekNumber}
+                  type={nextWidgetStep.type}
+                  title={nextWidgetStep.title}
+                  description={nextWidgetStep.description}
+                  actionText={nextWidgetStep.actionText}
+                  actionHref={nextWidgetStep.actionHref}
+                  completed={completedStepIds.includes(nextWidgetStep.id)}
+                  onToggleComplete={() =>
+                    handleToggleWidgetStep(nextWidgetStep.id)
+                  }
+                  onDismiss={() =>
+                    handleDismissWidgetStep(nextWidgetStep.id)
+                  }
+                  updating={completingStepId === nextWidgetStep.id}
+                />
+              )}
+
+              {/* Roadmap Widget: Congratulate if 100% complete */}
+              {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
+                <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Sparkles size={16} style={{ color: '#a16207' }} />
+                      <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Roadmap Complete! 🏆
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#713f12', fontWeight: 600 }}>
+                      You've completed all items on your current track! Ready to keep growing?
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection('roadmap')}
+                    style={{
+                      background: '#000',
+                      border: '1px solid #000',
+                      color: '#fff',
+                      padding: '8px 16px',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      fontFamily: 'DM Sans, sans-serif',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Switch Track
+                  </button>
+                </div>
+              )}
+
+              <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <div>
+                    <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4 }}>
+                      Unified Home Dashboard
+                    </h2>
+                    <div style={{ fontSize: '13px', color: '#9a9585' }}>
+                      Recent events, offers, and community posts in one place
+                    </div>
+                  </div>
+                </div>
+
+                {combinedItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
+                    <Rss size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>
+                      No recent activity yet
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif' }}>
+                      Events, offers, and community posts will appear here once available.
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {combinedItems.map(item => (
+                      <div key={`${item.type}-${item.id}`} style={{ padding: '18px 0', borderTop: '1px solid #f0efe9', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                            <span className="tag" style={{ fontSize: '10px', padding: '2px 8px', textTransform: 'uppercase' }}>
+                              {item.type}
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                              {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>
+                            {item.title?.length > 90 ? item.title.slice(0, 90) + '…' : item.title}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#9a9585' }}>{item.subtitle}</div>
+                        </div>
+
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#9b7011', textTransform: 'uppercase', flexShrink: 0 }}>
+                          {item.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 2, background: '#fff', border: '1px solid #e2e0d8', padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Quick Access</span>
+
+                <button onClick={() => setActiveSection('feed')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+                  <Rss size={13} /> Feed
+                </button>
+
+                <button onClick={() => setActiveSection('events')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+                  <Calendar size={13} /> My Events ({mySubmissions.length})
+                </button>
+
+                <button onClick={() => setActiveSection('offers')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+                  <Tag size={13} /> My Offers ({myOffers.length})
+                </button>
+
+                <button onClick={() => setActiveSection('awards')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+                  <Trophy size={13} /> My Awards ({myNominations.length})
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-
-        <div style={{ marginTop: 2, background: '#fff', border: '1px solid #e2e0d8', padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Quick Access</span>
-
-          <button onClick={() => setActiveSection('feed')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-            <Rss size={13} /> Feed
-          </button>
-
-          <button onClick={() => setActiveSection('events')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-            <Calendar size={13} /> My Events ({mySubmissions.length})
-          </button>
-
-          <button onClick={() => setActiveSection('offers')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-            <Tag size={13} /> My Offers ({myOffers.length})
-          </button>
-
-          <button onClick={() => setActiveSection('awards')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-            <Trophy size={13} /> My Awards ({myNominations.length})
-          </button>
-        </div>
-      </div>
-    );
+          );
   }
 
-  // ── Render ─────────────────────────────────────────────────────
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
+          // ── Render ─────────────────────────────────────────────────────
+          return (
+          <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
 
-      {/* Mobile overlay */}
-      {isMobile && sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55 }} />
-      )}
+            {/* Mobile overlay */}
+            {isMobile && sidebarOpen && (
+              <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55 }} />
+            )}
 
-      {/* Sidebar */}
-      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60, transform: (!isMobile || sidebarOpen) ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none' }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <Logo size="sm" />
-          </Link>
-          {isMobile && (
-            <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, display: 'flex' }}>
-              <CloseIcon size={20} />
-            </button>
-          )}
-        </div>
-
-        {/* Member card */}
-        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            {userProfile?.avatarUrl ? (
-              <img src={userProfile.avatarUrl} alt={member.name} style={{ width: 44, height: 44, objectFit: 'cover', flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: 44, height: 44, background: '#e7b605', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '18px', color: '#000', flexShrink: 0 }}>
-                {member.name.charAt(0)}
+            {/* Sidebar */}
+            <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60, transform: (!isMobile || sidebarOpen) ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none' }}>
+              <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Link href="/" style={{ textDecoration: 'none' }}>
+                  <Logo size="sm" />
+                </Link>
+                {isMobile && (
+                  <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, display: 'flex' }}>
+                    <CloseIcon size={20} />
+                  </button>
+                )}
               </div>
-            )}
-            <div>
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#fff' }}>{member.name}</div>
-              <div style={{ fontSize: '12px', color: '#888' }}>{member.business}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ padding: '3px 10px', background: '#1a1a1a', color: '#888', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em' }}>{member.industry}</span>
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: '11px', color: '#666' }}>Profile completion</span>
-              <span style={{ fontSize: '11px', color: '#e7b605', fontWeight: 700 }}>{member.profileCompletion}%</span>
-            </div>
-            <div style={{ height: 3, background: '#1a1a1a', borderRadius: 2 }}>
-              <div style={{ height: '100%', width: `${member.profileCompletion}%`, background: 'linear-gradient(90deg, #9b7011, #e7b605)', borderRadius: 2, transition: 'width 1s ease' }} />
-            </div>
-          </div>
-        </div>
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
-          {visibleNavItems.map(item => <NavItem key={item.label} item={item} />)}
-        </nav>
-
-        <div style={{ padding: '16px 0', borderTop: '1px solid #1a1a1a' }}>
-          <Link href="/dashboard/settings" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', textDecoration: 'none', color: '#666', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}>
-            <Settings size={16} /> Settings
-          </Link>
-          <button
-            onClick={async () => {
-              localStorage.removeItem('fe_my_submissions');
-              await logout();
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', color: '#666', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-          >
-            <LogOut size={16} /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, minWidth: 0 }}>
-        {/* Top bar */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
-                <Menu size={20} />
-              </button>
-            )}
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: isMobile ? '17px' : '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
-              </h1>
-              <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <NotificationBell />
-            {userProfile?.avatarUrl ? (
-              <img src={userProfile.avatarUrl} alt={member.name} style={{ width: 40, height: 40, objectFit: 'cover', border: '1px solid #e2e0d8', cursor: 'pointer' }} />
-            ) : (
-              <div style={{ width: 40, height: 40, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e7b605', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }}>
-                {member.name.charAt(0)}
+              {/* Member card */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                  {userProfile?.avatarUrl ? (
+                    <img src={userProfile.avatarUrl} alt={member.name} style={{ width: 44, height: 44, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 44, height: 44, background: '#e7b605', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '18px', color: '#000', flexShrink: 0 }}>
+                      {member.name.charAt(0)}
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#fff' }}>{member.name}</div>
+                    <div style={{ fontSize: '12px', color: '#888' }}>{member.business}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span style={{ padding: '3px 10px', background: '#1a1a1a', color: '#888', fontSize: '10px', fontWeight: 600, letterSpacing: '0.05em' }}>{member.industry}</span>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: '11px', color: '#666' }}>Profile completion</span>
+                    <span style={{ fontSize: '11px', color: '#e7b605', fontWeight: 700 }}>{member.profileCompletion}%</span>
+                  </div>
+                  <div style={{ height: 3, background: '#1a1a1a', borderRadius: 2 }}>
+                    <div style={{ height: '100%', width: `${member.profileCompletion}%`, background: 'linear-gradient(90deg, #9b7011, #e7b605)', borderRadius: 2, transition: 'width 1s ease' }} />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Section content */}
-        {activeSection === 'dashboard' && <DashboardSection />}
-        {activeSection === 'feed' && <FeedSection memberName={member.name} memberBusiness={member.business} basics={{ email: userProfile?.email, industry: member.industry, stage: member.stage, avatarUrl: userProfile?.avatarUrl }} />}
-        {activeSection === 'roadmap' && userProfile && (
-          <RoadmapSection userProfile={userProfile} onProfileUpdate={(updatedUser) => setUserProfile(updatedUser)} />
-        )}
-        {activeSection === 'events' && <EventsSection />}
-        {activeSection === 'offers' && <OffersSection />}
-        {activeSection === 'awards' && <AwardsSection />}
-        {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} />}
-        {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
-        {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
-        {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
-      </main>
+              {/* Nav */}
+              <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
+                {visibleNavItems.map(item => <NavItem key={item.label} item={item} />)}
+              </nav>
 
-      {/* Custom Confirmation Modal */}
-      {confirmModal.isOpen && (
-        <div
-          onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-          }}>
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-label={confirmModal.title}
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#fff',
-              border: '1px solid #e2e0d8',
-              padding: '32px',
-              maxWidth: '440px',
-              width: '90%',
-              textAlign: 'center',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}>
-            <h3 style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontWeight: 800,
-              fontSize: '20px',
-              color: '#2a2820',
-              marginBottom: '12px'
-            }}>
-              {confirmModal.title}
-            </h3>
-            <p style={{
-              fontFamily: 'Noto Serif, serif',
-              color: '#5a5650',
-              fontSize: '14px',
-              lineHeight: 1.6,
-              marginBottom: '24px'
-            }}>
-              {confirmModal.message}
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
+              <div style={{ padding: '16px 0', borderTop: '1px solid #1a1a1a' }}>
+                <Link href="/dashboard/settings" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', textDecoration: 'none', color: '#666', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px' }}>
+                  <Settings size={16} /> Settings
+                </Link>
+                <button
+                  onClick={async () => {
+                    localStorage.removeItem('fe_my_submissions');
+                    await logout();
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', color: '#666', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                >
+                  <LogOut size={16} /> Sign Out
+                </button>
+              </div>
+            </aside>
+
+            {/* Main */}
+            <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, minWidth: 0 }}>
+              {/* Top bar */}
+              <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  {isMobile && (
+                    <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
+                      <Menu size={20} />
+                    </button>
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: isMobile ? '17px' : '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {(activeSection === 'dashboard' || activeSection === 'feed') ? `Good morning, ${member.name.split(' ')[0]} 👋` : sectionTitles[activeSection]}
+                    </h1>
+                    <div style={{ fontSize: '13px', color: '#9a9585' }}>Member since {member.joined}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <NotificationBell />
+                  {userProfile?.avatarUrl ? (
+                    <img src={userProfile.avatarUrl} alt={member.name} style={{ width: 40, height: 40, objectFit: 'cover', border: '1px solid #e2e0d8', cursor: 'pointer' }} />
+                  ) : (
+                    <div style={{ width: 40, height: 40, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e7b605', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }}>
+                      {member.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Section content */}
+              {activeSection === 'dashboard' && <DashboardSection />}
+              {activeSection === 'feed' && <FeedSection memberName={member.name} memberBusiness={member.business} basics={{ email: userProfile?.email, industry: member.industry, stage: member.stage, avatarUrl: userProfile?.avatarUrl }} />}
+              {activeSection === 'roadmap' && userProfile && (
+                <RoadmapSection userProfile={userProfile} onProfileUpdate={(updatedUser) => setUserProfile(updatedUser)} />
+              )}
+              {activeSection === 'events' && <EventsSection />}
+              {activeSection === 'offers' && <OffersSection />}
+              {activeSection === 'awards' && <AwardsSection />}
+              {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} />}
+              {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
+              {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
+              {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
+            </main>
+
+            {/* Custom Confirmation Modal */}
+            {confirmModal.isOpen && (
+              <div
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
                 style={{
-                  padding: '10px 20px',
-                  border: '1px solid #e2e0d8',
-                  background: 'transparent',
-                  fontFamily: 'DM Sans, sans-serif',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  color: '#5a5650'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  confirmModal.onConfirm();
-                  setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                }}
-                className="btn-primary"
-                style={{
-                  padding: '10px 20px',
-                  fontSize: '13px',
-                  background: '#c0392b',
-                  borderColor: '#c0392b',
-                  color: '#fff',
-                  cursor: 'pointer'
-                }}
-              >
-                Confirm
-              </button>
-            </div>
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0,0,0,0.6)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 9999,
+                }}>
+                <div
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-label={confirmModal.title}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    background: '#fff',
+                    border: '1px solid #e2e0d8',
+                    padding: '32px',
+                    maxWidth: '440px',
+                    width: '90%',
+                    textAlign: 'center',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+                  }}>
+                  <h3 style={{
+                    fontFamily: 'DM Sans, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '20px',
+                    color: '#2a2820',
+                    marginBottom: '12px'
+                  }}>
+                    {confirmModal.title}
+                  </h3>
+                  <p style={{
+                    fontFamily: 'Noto Serif, serif',
+                    color: '#5a5650',
+                    fontSize: '14px',
+                    lineHeight: 1.6,
+                    marginBottom: '24px'
+                  }}>
+                    {confirmModal.message}
+                  </p>
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                    <button
+                      onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                      style={{
+                        padding: '10px 20px',
+                        border: '1px solid #e2e0d8',
+                        background: 'transparent',
+                        fontFamily: 'DM Sans, sans-serif',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        color: '#5a5650'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        confirmModal.onConfirm();
+                        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                      }}
+                      className="btn-primary"
+                      style={{
+                        padding: '10px 20px',
+                        fontSize: '13px',
+                        background: '#c0392b',
+                        borderColor: '#c0392b',
+                        color: '#fff',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
+          );
 }

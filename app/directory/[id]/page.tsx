@@ -153,45 +153,70 @@ export default function BusinessProfilePage({ params }: BusinessProfilePageProps
                     key={offer.id}
                     style={{
                       border: '1px solid #e2e0d8',
-                      padding: 20,
-                      background: '#f9f9f7',
+                      borderTop: '4px solid #e7b605',
+                      padding: 24,
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 16,
+                      transition: 'all 0.2s',
                     }}
                   >
+                    {/* Discount hero */}
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
+                        alignItems: 'flex-start',
                         gap: 16,
                         flexWrap: 'wrap',
-                        marginBottom: 10,
                       }}
                     >
                       <div>
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontWeight: 700,
+                            fontSize: '11px',
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: '#9a9585',
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Tag size={12} style={{ color: '#e7b605' }} />
+                          Member Offer
+                        </div>
+
+                        <div
+                          style={{
+                            fontFamily: 'DM Sans, sans-serif',
+                            fontWeight: 900,
+                            fontSize: 'clamp(30px, 4vw, 44px)',
+                            lineHeight: 1,
+                            color: '#e7b605',
+                            letterSpacing: '-0.03em',
+                            marginBottom: 10,
+                          }}
+                        >
+                          {offer.discount}
+                        </div>
+
                         <h3
                           style={{
                             fontFamily: 'DM Sans, sans-serif',
                             fontWeight: 800,
                             fontSize: '18px',
                             color: '#2a2820',
-                            marginBottom: 6,
+                            margin: 0,
+                            lineHeight: 1.3,
                           }}
                         >
                           {offer.title}
                         </h3>
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            color: '#9b7011',
-                            fontFamily: 'DM Sans, sans-serif',
-                            fontWeight: 800,
-                            fontSize: '14px',
-                          }}
-                        >
-                          <Tag size={13} />
-                          {offer.discount}
-                        </div>
                       </div>
 
                       <div
@@ -200,13 +225,53 @@ export default function BusinessProfilePage({ params }: BusinessProfilePageProps
                           alignItems: 'center',
                           gap: 6,
                           color: '#9a9585',
-                          fontSize: '13px',
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontSize: '12px',
+                          whiteSpace: 'nowrap',
+                          paddingTop: 4,
                         }}
                       >
                         <Calendar size={13} style={{ color: '#e7b605' }} />
-                        Expires {new Date(offer.expiryDate).toLocaleDateString('en-CA')}
+                        Expires{' '}
+                        {new Date(offer.expiryDate).toLocaleDateString('en-CA', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </div>
                     </div>
+
+                    <p
+                      style={{
+                        fontFamily: 'Noto Serif, serif',
+                        color: '#5a5650',
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                        margin: 0,
+                      }}
+                    >
+                      {offer.description}
+                    </p>
+
+                    <div
+                      style={{
+                        paddingTop: 16,
+                        borderTop: '1px solid #f0efe9',
+                      }}
+                    >
+                      <Link
+                        href={`/offers/${offer.id}`}
+                        className="btn-primary"
+                        style={{
+                          display: 'inline-flex',
+                          padding: '9px 18px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        View Offer
+                      </Link>
+                    </div>
+
 
                     <p
                       style={{
