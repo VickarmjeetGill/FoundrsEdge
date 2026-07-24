@@ -64,6 +64,7 @@ export default async function CoachDashboardPage() {
                     initialSessionId={latestSession?.id}
                     initialMessages={preloadedMessages}
                     scorecard={serializedScorecard}
+                    showSessionsSidebar={true}
                 />
             </div>
         </main>

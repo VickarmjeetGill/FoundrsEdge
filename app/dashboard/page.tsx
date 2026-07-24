@@ -7,7 +7,7 @@ import {
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
   UserCircle, Globe, MapPin, Rss, Sparkles, Menu, X as CloseIcon,
-  Bot
+  Bot, BarChart2, Target, RefreshCw, ArrowUpRight
 } from 'lucide-react';
 import FeedSection from './FeedSection';
 import RoadmapSection from './RoadmapSection';
@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile, getRoadmap, toggleStepCompletion } from '@/app/actions/profile';
 import AICoachChat from '@/components/AICoachChat';
-import { getScorecardHistory } from '@/app/actions/scorecard';
+import { getScorecardHistory, updateScorecardGoals } from '@/app/actions/scorecard';
 
 type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners' | 'roadmap' | 'matches' | 'coach';
 
@@ -54,6 +54,7 @@ const navItems: { icon: React.ElementType; label: string; section?: Section; hre
   { icon: Rss, label: 'Feed', section: 'feed' },
   { icon: TrendingUp, label: 'Dashboard', section: 'dashboard' },
   { icon: Bot, label: 'AI Business Coach', section: 'coach' },
+  { icon: BarChart2, label: 'Scorecard', href: '/dashboard/scorecard' },
   { icon: CheckCircle, label: 'My Roadmap', section: 'roadmap' },
   { icon: Calendar, label: 'Events', section: 'events' },
   { icon: Tag, label: 'Offers', section: 'offers' },
@@ -749,15 +750,48 @@ export default function DashboardPage() {
   const [nomTotalPages, setNomTotalPages] = useState(1);
   const itemPerPage = 3;
   const [latestScorecard, setLatestScorecard] = useState<any>(null);
+  const [previousScorecard, setPreviousScorecard] = useState<any>(null);
+  const DEFAULT_WIDGET_GOALS = { connections: 3, events: 2, directory: 1, opportunities: 2, awards: 1, accountability: 1, revenue: '', custom: '' };
+  const [widgetGoals, setWidgetGoals] = useState<Record<string, any>>(DEFAULT_WIDGET_GOALS);
+  const [savingWidgetGoals, setSavingWidgetGoals] = useState(false);
+  const [widgetGoalsSaved, setWidgetGoalsSaved] = useState(false);
+  const [editingWidgetGoals, setEditingWidgetGoals] = useState(false);
+  const [showWidgetDetails, setShowWidgetDetails] = useState(false);
 
   const loadScorecard = async () => {
     try {
       const res = await getScorecardHistory();
       if (res.success && res.submissions && res.submissions.length > 0) {
-        setLatestScorecard(res.submissions[0]);
+        const sc = res.submissions[0];
+        setLatestScorecard(sc);
+        if (res.submissions.length > 1) setPreviousScorecard(res.submissions[1]);
+        if (sc.goals) {
+          setWidgetGoals(prev => ({ ...prev, ...(sc.goals as any) }));
+          setWidgetGoalsSaved(true);
+        }
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSaveWidgetGoals = async () => {
+    if (!latestScorecard) return;
+    setSavingWidgetGoals(true);
+    try {
+      const res = await updateScorecardGoals(latestScorecard.id, widgetGoals);
+      if (res.success) {
+        setWidgetGoalsSaved(true);
+        setEditingWidgetGoals(false);
+        setLatestScorecard((prev: any) => ({ ...prev, goals: widgetGoals }));
+      } else {
+        alert((res as any).error || 'Failed to save goals');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving goals.');
+    } finally {
+      setSavingWidgetGoals(false);
     }
   };
 
@@ -1597,6 +1631,323 @@ export default function DashboardPage() {
             ))}
           </div>
 
+          {/* ── Scorecard Widget (Redesigned & Simplified) ──── */}
+          {(() => {
+            const daysSince = latestScorecard
+              ? Math.floor((Date.now() - new Date(latestScorecard.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+            const retakeReady = daysSince !== null && daysSince >= 30;
+            const cats = latestScorecard?.categories as Record<string, number> | null;
+
+            const scoreDiff = latestScorecard && previousScorecard
+              ? latestScorecard.score - previousScorecard.score
+              : null;
+
+            const scoreColor = latestScorecard
+              ? (latestScorecard.score >= 70 ? '#27ae60' : latestScorecard.score >= 40 ? '#e7b605' : '#e74c3c')
+              : '#9a9585';
+            const scoreLabel = latestScorecard
+              ? (latestScorecard.score >= 70 ? 'Strong' : latestScorecard.score >= 40 ? 'Growing' : 'Early Stage')
+              : '';
+
+            const GOAL_LABELS: Record<string, string> = {
+              connections: 'New Connections',
+              events: 'Events',
+              directory: 'Directory',
+              opportunities: 'Opportunities',
+              awards: 'Nominations',
+              accountability: 'Check-ins',
+            };
+
+            const GOAL_ICONS: Record<string, string> = {
+              connections: '🤝',
+              events: '📅',
+              directory: '📁',
+              opportunities: '🚀',
+              awards: '🏆',
+              accountability: '🎯',
+            };
+
+            const activeGoalPills = latestScorecard
+              ? (Object.entries(widgetGoals) as [string, any][])
+                  .filter(([k, v]) => GOAL_LABELS[k] && typeof v === 'number' && v > 0)
+              : [];
+
+            return (
+              <div style={{
+                background: '#fff',
+                border: '1px solid #e2e0d8',
+                marginBottom: 32,
+                padding: '24px 28px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart2 size={16} style={{ color: '#e7b605' }} />
+                    <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Entrepreneur Scorecard
+                    </span>
+                  </div>
+                  {latestScorecard && (
+                    <Link href="/dashboard/scorecard" style={{ fontSize: '12px', fontWeight: 700, color: '#9b7011', textDecoration: 'none' }}>
+                      View Full Breakdown →
+                    </Link>
+                  )}
+                </div>
+
+                {latestScorecard ? (
+                  <div>
+                    {/* Top Row: Score + Basic Info + Dropdown Toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                        {/* Score Ring */}
+                        {(() => {
+                          const r = 30;
+                          const circ = 2 * Math.PI * r;
+                          const offset = circ - (circ * latestScorecard.score) / 100;
+                          return (
+                            <svg width="72" height="72" viewBox="0 0 72 72">
+                              <circle cx="36" cy="36" r={r} fill="none" stroke="#f0efe9" strokeWidth="6" />
+                              <circle
+                                cx="36" cy="36" r={r}
+                                fill="none"
+                                stroke={scoreColor}
+                                strokeWidth="6"
+                                strokeLinecap="round"
+                                strokeDasharray={circ}
+                                strokeDashoffset={offset}
+                                transform="rotate(-90 36 36)"
+                                style={{ transition: 'stroke-dashoffset 1s ease' }}
+                              />
+                              <text x="36" y="41" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontWeight="950" fontSize="18" fill="#2a2820">{latestScorecard.score}</text>
+                            </svg>
+                          );
+                        })()}
+
+                        {/* Title, Level, and Change Indicator */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                            <span style={{ fontSize: '16px', fontWeight: 850, color: '#2a2820', fontFamily: 'DM Sans, sans-serif' }}>
+                              Overall Rating: {latestScorecard.score}%
+                            </span>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              color: scoreColor,
+                              background: `${scoreColor}15`,
+                              padding: '2px 8px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.03em',
+                            }}>
+                              {scoreLabel}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12px', color: '#9a9585' }}>
+                            <span>Taken {daysSince === 0 ? 'today' : daysSince === 1 ? '1 day ago' : `${daysSince} days ago`}</span>
+                            {scoreDiff !== null && (
+                              <span style={{
+                                fontWeight: 700,
+                                color: scoreDiff > 0 ? '#27ae60' : scoreDiff < 0 ? '#e74c3c' : '#9a9585',
+                              }}>
+                                ({scoreDiff > 0 ? `+${scoreDiff}% improvement` : scoreDiff < 0 ? `${scoreDiff}% decrease` : 'no change'})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dropdown Action Button */}
+                      <button
+                        onClick={() => setShowWidgetDetails(!showWidgetDetails)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: '#fafaf9',
+                          border: '1px solid #e2e0d8',
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: '#5a5650',
+                          cursor: 'pointer',
+                          fontFamily: 'DM Sans, sans-serif',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {showWidgetDetails ? 'Hide Detailed Breakdown' : 'Show Detailed Breakdown & Goals'}
+                        <ChevronRight
+                          size={14}
+                          style={{
+                            transform: showWidgetDetails ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 0.2s',
+                          }}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Collapsible Dropdown Content: Capabilities and Goals */}
+                    {showWidgetDetails && (
+                      <div style={{
+                        marginTop: 20,
+                        borderTop: '1px solid #f0efe9',
+                        paddingTop: 20,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 24,
+                      }}>
+                        {/* Capabilities (Vertical list) */}
+                        {cats && Object.keys(cats).length > 0 && (
+                          <div style={{ maxWidth: 500 }}>
+                            <div style={{ fontSize: '11px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+                              Core Capabilities Breakdown
+                            </div>
+                            {Object.entries(cats).map(([cat, val]) => {
+                              const barColor = val >= 70 ? '#27ae60' : val >= 40 ? '#e7b605' : '#e74c3c';
+                              return (
+                                <div key={cat} style={{ marginBottom: 10 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <span style={{ fontSize: '12px', color: '#5a5650', fontWeight: 600 }}>{cat}</span>
+                                    <span style={{ fontSize: '11px', fontWeight: 800, color: barColor }}>{val}%</span>
+                                  </div>
+                                  <div style={{ height: 4, background: '#f0efe9', borderRadius: 2, overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${val}%`, background: barColor, borderRadius: 2 }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Goals (Vertical list) */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, maxWidth: 500 }}>
+                            <div style={{ fontSize: '11px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              My 30-Day Goals
+                            </div>
+                            {!editingWidgetGoals && (
+                              <button
+                                onClick={() => setEditingWidgetGoals(true)}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  background: 'none', border: '1px solid #e2e0d8',
+                                  cursor: 'pointer', fontSize: '10px', fontWeight: 700,
+                                  color: '#9b7011', padding: '3px 10px',
+                                  fontFamily: 'DM Sans, sans-serif',
+                                }}
+                              >
+                                <Pencil size={10} /> Edit Goals
+                              </button>
+                            )}
+                          </div>
+
+                          {editingWidgetGoals ? (
+                            <div style={{ maxWidth: 400 }}>
+                              {([
+                                { key: 'connections',    label: 'Connections',     suffix: 'people'     },
+                                { key: 'events',         label: 'Events',          suffix: 'events'     },
+                                { key: 'directory',      label: 'Directory',       suffix: 'partners'   },
+                                { key: 'opportunities',  label: 'Opportunities',   suffix: 'from feed'  },
+                                { key: 'awards',         label: 'Nominations',     suffix: 'awards'     },
+                                { key: 'accountability', label: 'Coach Check-ins', suffix: 'sessions'   },
+                              ]).map(({ key, label, suffix }) => (
+                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                                  <span style={{ fontSize: '12px', color: '#5a5650', fontWeight: 600, flex: 1 }}>{label}</span>
+                                  <input
+                                    type="number" min="0"
+                                    value={widgetGoals[key] ?? 0}
+                                    onChange={e => setWidgetGoals(p => ({ ...p, [key]: parseInt(e.target.value) || 0 }))}
+                                    style={{ width: 44, padding: '3px 5px', border: '1px solid #e2e0d8', textAlign: 'center', fontSize: '12px', fontWeight: 700 }}
+                                  />
+                                  <span style={{ fontSize: '11px', color: '#b8b4ae' }}>{suffix}</span>
+                                </div>
+                              ))}
+                              <input
+                                type="text" placeholder="Revenue target (e.g. $10k/mo)"
+                                value={widgetGoals.revenue ?? ''}
+                                onChange={e => setWidgetGoals(p => ({ ...p, revenue: e.target.value }))}
+                                style={{ width: '100%', padding: '6px 8px', border: '1px solid #e2e0d8', fontSize: '12px', marginBottom: 6, boxSizing: 'border-box' }}
+                              />
+                              <input
+                                type="text" placeholder="Custom goal (e.g. Launch MVP)"
+                                value={widgetGoals.custom ?? ''}
+                                onChange={e => setWidgetGoals(p => ({ ...p, custom: e.target.value }))}
+                                style={{ width: '100%', padding: '6px 8px', border: '1px solid #e2e0d8', fontSize: '12px', marginBottom: 12, boxSizing: 'border-box' }}
+                              />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                  onClick={handleSaveWidgetGoals}
+                                  disabled={savingWidgetGoals}
+                                  className="btn-primary"
+                                  style={{ fontSize: '11px', padding: '6px 14px', border: 'none', cursor: 'pointer', flex: 1 }}
+                                >
+                                  {savingWidgetGoals ? 'Saving…' : 'Save Goals'}
+                                </button>
+                                <button
+                                  onClick={() => setEditingWidgetGoals(false)}
+                                  style={{ fontSize: '11px', padding: '6px 10px', border: '1px solid #e2e0d8', background: 'transparent', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: '#5a5650' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 500 }}>
+                              {activeGoalPills.length > 0 ? (
+                                <>
+                                  {activeGoalPills.map(([key, val]) => (
+                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
+                                      <span style={{ fontSize: '15px' }}>{GOAL_ICONS[key]}</span>
+                                      <span>{GOAL_LABELS[key]}: <strong style={{ color: '#9b7011' }}>{val}</strong></span>
+                                    </div>
+                                  ))}
+                                  {widgetGoals.revenue && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
+                                      <span style={{ fontSize: '15px' }}>💰</span>
+                                      <span>Revenue Target: <strong style={{ color: '#9b7011' }}>{widgetGoals.revenue}</strong></span>
+                                    </div>
+                                  )}
+                                  {widgetGoals.custom && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
+                                      <span style={{ fontSize: '15px' }}>✏️</span>
+                                      <span>Custom Goal: <em style={{ color: '#9b7011' }}>"{widgetGoals.custom}"</em></span>
+                                    </div>
+                                  )}
+                                  {widgetGoalsSaved && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '11px', fontWeight: 700, color: '#27ae60' }}>
+                                      <CheckCircle size={12} /> Goals saved successfully
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div style={{ fontSize: '12px', color: '#9a9585', fontFamily: 'Noto Serif, serif', fontStyle: 'italic' }}>
+                                  No active goals set yet. Click <strong style={{ fontStyle: 'normal', color: '#9b7011', cursor: 'pointer' }} onClick={() => setEditingWidgetGoals(true)}>Edit Goals</strong> to set your monthly targets.
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* ── Empty / No Scorecard State ── */
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 260 }}>
+                      <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '18px', margin: '0 0 6px 0', color: '#2a2820' }}>
+                        Assess Your Business Maturity
+                      </h3>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#5a5650', fontFamily: 'Noto Serif, serif', lineHeight: 1.5 }}>
+                        Take the 2-minute scorecard quiz to analyze your operations, marketing, and cash flow stability, and unlock customized milestones.
+                      </p>
+                    </div>
+                    <Link href="/dashboard/scorecard" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '12px', padding: '10px 20px', textDecoration: 'none' }}>
+                      Take Scorecard <ChevronRight size={14} />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Roadmap Widget: Your Next Step This Week */}
           {!roadmapLoading && nextWidgetStep && (
             <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
@@ -1857,7 +2208,7 @@ export default function DashboardPage() {
             {/* Main */}
             <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, minWidth: 0 }}>
               {/* Top bar */}
-              <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
+              <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100, gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   {isMobile && (
                     <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
@@ -1907,6 +2258,8 @@ export default function DashboardPage() {
                       categories: latestScorecard.categories as Record<string, number>,
                       createdAt: latestScorecard.createdAt
                     } : null}
+                    isStandalonePage={true}
+                    showSessionsSidebar={true}
                   />
                 </div>
               )}

@@ -38,9 +38,11 @@ const placeholderTags = ['funding', 'hiring', 'yyc', 'saas', 'partnerships'];
 export default function FeedSection({ memberName, memberBusiness, basics }: Props) {
   const [posts, setPosts]   = useState<Post[]>([]);
   const [filter, setFilter] = useState<FeedFilter>('all');
+  const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const check = () => setIsMobile(window.innerWidth < 900);
     check();
     window.addEventListener('resize', check);
@@ -91,8 +93,20 @@ export default function FeedSection({ memberName, memberBusiness, basics }: Prop
   const railLabel: React.CSSProperties = { fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9b7011', marginBottom: 12 };
   const railCard: React.CSSProperties = { background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12, padding: '16px' };
 
+  if (!mounted) {
+    return (
+      <div style={{ padding: '32px 40px' }} suppressHydrationWarning>
+        <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', gap: 24 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ height: 400, background: '#fff', border: '1px solid #e2e0d8', borderRadius: 12 }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ padding: isMobile ? '20px 16px' : '32px 40px' }}>
+    <div style={{ padding: isMobile ? '20px 16px' : '32px 40px' }} suppressHydrationWarning>
      <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
 
       {/* ── Center column ─────────────────────────────── */}
@@ -176,10 +190,10 @@ export default function FeedSection({ memberName, memberBusiness, basics }: Prop
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: 6 }}>
             <span style={{ color: '#9a9585' }}>Profile completion</span>
-            <span style={{ color: '#9b7011', fontWeight: 700 }}>{completion.percent}%</span>
+            <span style={{ color: '#9b7011', fontWeight: 700 }}>{mounted ? `${completion.percent}%` : '0%'}</span>
           </div>
           <div style={{ height: 4, background: '#f0efe9', borderRadius: 2 }}>
-            <div style={{ height: '100%', width: `${completion.percent}%`, background: 'linear-gradient(90deg, #9b7011, #e7b605)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+            <div style={{ height: '100%', width: mounted ? `${completion.percent}%` : '0%', background: 'linear-gradient(90deg, #9b7011, #e7b605)', borderRadius: 2, transition: 'width 0.5s ease' }} />
           </div>
           {completion.remaining > 0 && (
             <div style={{ marginTop: 10, fontSize: '11px', color: '#9a9585', fontFamily: 'Noto Serif, serif' }}>

@@ -66,7 +66,7 @@ export default function NotificationBell() {
   const unread = notifs.filter(n => !n.read).length;
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', zIndex: 100 }}>
       {/* Bell button */}
       <button
         onClick={toggleOpen}

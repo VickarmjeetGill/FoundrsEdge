@@ -1,7 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, Bot, X, Plus, ChevronRight, Trophy, Paperclip, Send, Target, Users, TrendingUp, HelpCircle } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Sparkles, Bot, X, Plus, ChevronRight, Trophy, Paperclip, Send, Target, Users, TrendingUp, HelpCircle, Calendar, Tag, PanelLeftOpen, PanelLeftClose, Pencil } from "lucide-react";
+import ChatSessionsSidebar, { SessionItem } from "./ChatSessionsSidebar";
+import { getChatSessions, getChatSession, editChatMessage } from "@/app/actions/chat";
+
+interface ParsedResource {
+    type: 'event' | 'offer' | 'match' | 'roadmap' | 'action';
+    title: string;
+    id?: string;
+}
 
 interface Message {
     id?: string;
@@ -14,6 +22,8 @@ interface AICoachChatProps {
     initialSessionId?: string;
     initialMessages?: Message[];
     isWidget?: boolean;
+    isStandalonePage?: boolean;
+    showSessionsSidebar?: boolean;
     onClose?: () => void;
     userName?: string;
     userAvatarUrl?: string | null;
@@ -29,6 +39,8 @@ export default function AICoachChat({
     initialSessionId, 
     initialMessages = [], 
     isWidget = false, 
+    isStandalonePage = false,
+    showSessionsSidebar = false,
     onClose,
     userName = "Member",
     userAvatarUrl = null,
@@ -40,7 +52,13 @@ export default function AICoachChat({
     const [isLoading, setIsLoading] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSessionsOpen, setIsSessionsOpen] = useState(true);
+    const [showNewChatConfirm, setShowNewChatConfirm] = useState(false);
+    const [sessions, setSessions] = useState<SessionItem[]>([]);
     const [hoveredQuestion, setHoveredQuestion] = useState<string | null>(null);
+    const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+    const [editingContent, setEditingContent] = useState<string>("");
+    const [status, setStatus] = useState<"online" | "rate-limited">("online");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -52,12 +70,11 @@ export default function AICoachChat({
     };
 
     const starterQuestions = [
-        "What should I do next?",
-        "Find me a grant",
-        "How do I grow my team?",
-        "How can I improve my margins?"
+        "What local Alberta grants am I eligible for?",
+        "How do I prepare my pitch deck for seed investors?",
+        "What pricing strategy fits my business model?",
+        "How do I acquire my first 100 paying customers?"
     ];
-
 
     // Auto-scroll to the bottom when new messages arrive
     const scrollToBottom = () => {
@@ -67,6 +84,17 @@ export default function AICoachChat({
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Load sessions list for the sidebar
+    const loadSessions = useCallback(async () => {
+        if (!showSessionsSidebar) return;
+        const res = await getChatSessions();
+        if (res.success) setSessions(res.sessions as SessionItem[]);
+    }, [showSessionsSidebar]);
+
+    useEffect(() => {
+        loadSessions();
+    }, [loadSessions]);
 
     useEffect(() => {
         // Fetch session history if none is preloaded
@@ -82,6 +110,10 @@ export default function AICoachChat({
                                 role: msg.role,
                                 content: msg.content
                             })));
+                            const lastMsg = data.messages[data.messages.length - 1];
+                            if (lastMsg.role === "assistant" && lastMsg.content.includes("experiencing high community traffic")) {
+                                setStatus("rate-limited");
+                            }
                         }
                         if (data.sessionId) {
                             setSessionId(data.sessionId);
@@ -96,6 +128,197 @@ export default function AICoachChat({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const handleNewChat = (force = false) => {
+        if (messages.length > 0 && !force) {
+            setShowNewChatConfirm(true);
+            return;
+        }
+        setShowNewChatConfirm(false);
+        setMessages([]);
+        setSessionId(undefined);
+        // Refresh sessions list so newly saved session appears
+        loadSessions();
+    };
+
+    const handleLoadSession = async (sid: string) => {
+        try {
+            const response = await fetch(`/api/coach?sessionId=${sid}`);
+            if (response.ok) {
+                const data = await response.json();
+                setMessages(data.messages.map((msg: any) => ({
+                    id: msg.id,
+                    role: msg.role,
+                    content: msg.content,
+                })));
+                setSessionId(data.sessionId);
+                
+                setStatus("online");
+                if (data.messages && data.messages.length > 0) {
+                    const lastMsg = data.messages[data.messages.length - 1];
+                    if (lastMsg.role === "assistant" && lastMsg.content.includes("experiencing high community traffic")) {
+                        setStatus("rate-limited");
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error loading session:", err);
+        }
+    };
+
+    const handleSessionDeleted = (deletedId: string) => {
+        setSessions((prev) => prev.filter((s) => s.id !== deletedId));
+        // If the deleted session is the active one, start fresh
+        if (deletedId === sessionId) {
+            setMessages([]);
+            setSessionId(undefined);
+        }
+    };
+
+    const parseResources = (text: string | undefined | null): { cleanText: string; resources: ParsedResource[] } => {
+        if (!text) return { cleanText: "", resources: [] };
+        
+        const resources: ParsedResource[] = [];
+        // Regex to match [Resource: type|title] or [Resource: type|title|id]
+        const regex = /\[Resource:\s*(event|offer|match|roadmap|action)\|([^|\]]+)(?:\|([^\]]+))?\]/gi;
+        
+        let match;
+        // Collect all resources
+        while ((match = regex.exec(text)) !== null) {
+            resources.push({
+                type: match[1].toLowerCase() as any,
+                title: match[2].trim(),
+                id: match[3] ? match[3].trim() : undefined
+            });
+        }
+        
+        // Replace resource tags in the text with bold title text so sentences remain grammatically complete
+        let cleanText = text.replace(regex, (_, type, title) => `**${title.trim()}**`).trim();
+
+        // Strip hanging empty headers like "Resources:", "**Resources:**", "### Resources:" if left at the end or on a line by itself
+        cleanText = cleanText
+            .replace(/(?:\n|^)\s*(?:#{1,6}\s*|\*\*|)?(?:Recommended\s+)?Resources:?\s*(?:\*\*|)?\s*$/gi, "")
+            .replace(/(?:\n|^)\s*(?:#{1,6}\s*|\*\*|)?(?:Recommended\s+)?Resources:?\s*(?:\*\*|)?\s*\n\s*\n/gi, "\n\n")
+            .trim();
+        
+        return { cleanText, resources };
+    };
+
+    const handleResourceClick = (resource: ParsedResource) => {
+        if (resource.type === 'action') {
+            const titleLower = resource.title.toLowerCase();
+            if (titleLower.includes('event')) {
+                window.location.href = '/events/submit';
+            } else if (titleLower.includes('offer')) {
+                window.location.href = '/offers/submit';
+            } else {
+                window.location.href = '/dashboard?tab=business';
+            }
+            return;
+        }
+
+        if (resource.type === 'event') {
+            if (resource.id) {
+                window.location.href = `/events/${resource.id}`;
+            } else {
+                window.location.href = `/events?q=${encodeURIComponent(resource.title)}`;
+            }
+            return;
+        }
+
+        if (resource.type === 'offer') {
+            if (resource.id) {
+                window.location.href = `/offers/${resource.id}`;
+            } else {
+                window.location.href = `/offers?q=${encodeURIComponent(resource.title)}`;
+            }
+            return;
+        }
+
+        if (resource.type === 'match') {
+            window.location.href = '/dashboard?tab=matches';
+            return;
+        }
+
+        if (resource.type === 'roadmap') {
+            window.location.href = '/dashboard?tab=roadmap';
+            return;
+        }
+    };
+
+    const renderResourceCards = (resources: ParsedResource[]) => {
+        if (resources.length === 0) return null;
+        
+        const typeStyles: Record<string, { icon: React.ReactNode; bg: string; border: string; text: string; label: string }> = {
+            event: {
+                icon: <Calendar size={15} className="text-emerald-600" />,
+                bg: "bg-emerald-50/60",
+                border: "border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-100/50",
+                text: "text-emerald-800",
+                label: "Event Recommendation"
+            },
+            offer: {
+                icon: <Tag size={15} className="text-amber-600" />,
+                bg: "bg-amber-50/60",
+                border: "border-amber-100 hover:border-amber-300 hover:shadow-amber-100/50",
+                text: "text-amber-800",
+                label: "Special Partner Offer"
+            },
+            match: {
+                icon: <Users size={15} className="text-blue-600" />,
+                bg: "bg-blue-50/60",
+                border: "border-blue-100 hover:border-blue-300 hover:shadow-blue-100/50",
+                text: "text-blue-800",
+                label: "Founder Match"
+            },
+            roadmap: {
+                icon: <Target size={15} className="text-purple-600" />,
+                bg: "bg-purple-50/60",
+                border: "border-purple-100 hover:border-purple-300 hover:shadow-purple-100/50",
+                text: "text-purple-800",
+                label: "Roadmap Action Item"
+            },
+            action: {
+                icon: <Plus size={15} className="text-[#9b7011]" />,
+                bg: "bg-amber-50/80",
+                border: "border-amber-200 hover:border-amber-400 hover:shadow-amber-100/50",
+                text: "text-amber-900",
+                label: "Community Action"
+            }
+        };
+
+        return (
+            <div className="mt-3 flex flex-col gap-2.5 w-full">
+                {resources.map((res, i) => {
+                    const style = typeStyles[res.type] || typeStyles.roadmap;
+                    return (
+                        <div
+                            key={i}
+                            onClick={() => handleResourceClick(res)}
+                            className={`p-3.5 border rounded-2xl flex items-center justify-between gap-4 cursor-pointer transition-all duration-200 active:scale-[0.99] group shadow-sm bg-white ${style.border}`}
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${style.bg}`}>
+                                    {style.icon}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-sans">
+                                        {style.label}
+                                    </span>
+                                    <span className="text-[14px] font-bold text-zinc-800 tracking-tight leading-tight mt-0.5 truncate group-hover:text-zinc-950 font-sans">
+                                        {res.title}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="w-7 h-7 rounded-full bg-zinc-50 border border-zinc-100 flex items-center justify-center text-zinc-400 group-hover:text-zinc-700 group-hover:bg-zinc-100 transition-colors flex-shrink-0">
+                                <ChevronRight size={14} />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const handleSend = async (e?: React.FormEvent | React.KeyboardEvent, textOverride?: string) => {
         if (e) e.preventDefault();
         const contentToSend = textOverride || input;
@@ -107,8 +330,8 @@ export default function AICoachChat({
             setInput("");
         }
         setIsLoading(true);
-
         try {
+            setStatus("online");
             const response = await fetch("/api/coach", {
                 method: "POST",
                 headers: {
@@ -121,25 +344,157 @@ export default function AICoachChat({
             });
 
             if (!response.ok) {
+                if (response.status === 429) {
+                    setStatus("rate-limited");
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || "Rate limit reached. Please wait a minute before sending another message.");
+                }
                 throw new Error("Failed to send message");
             }
 
-            const data = await response.json();
-            
-            if (data.sessionId && !sessionId) {
-                setSessionId(data.sessionId);
+            const headerSessionId = response.headers.get("X-Session-ID");
+            if (headerSessionId && !sessionId) {
+                setSessionId(headerSessionId);
+                // New session created — refresh the sessions list
+                loadSessions();
             }
 
-            const aiMessage: Message = { 
-                role: "assistant", 
-                content: data.message?.content || data.reply || "Sorry, I couldn't generate a response right now." 
-            };
-            setMessages((prev) => [...prev, aiMessage]);
-        } catch (error) {
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            // Insert initial empty assistant message to show the speech bubble
+            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+            setIsLoading(false); // Hide standard analyzing indicator once content streaming starts
+
+            if (reader) {
+                let accumulated = "";
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    accumulated += chunk;
+
+                    if (accumulated.includes("experiencing high community traffic")) {
+                        setStatus("rate-limited");
+                    }
+
+                    // Update the last message progressively
+                    setMessages((prev) => {
+                        const updated = [...prev];
+                        if (updated.length > 0) {
+                            updated[updated.length - 1] = {
+                                role: "assistant",
+                                content: accumulated,
+                            };
+                        }
+                        return updated;
+                    });
+                }
+
+                // Load messages from database so they get real database IDs immediately
+                const currentSessionId = sessionId || headerSessionId;
+                if (currentSessionId) {
+                    const res = await getChatSession(currentSessionId);
+                    if (res.success && res.messages) {
+                        setMessages(res.messages);
+                    }
+                }
+            }
+        } catch (error: any) {
             console.error("Error in chat:", error);
             const errorMessage: Message = {
                 role: "assistant",
-                content: "⚠️ **Error**: Failed to send message. Please verify your connection and try again."
+                content: `⚠️ **Error**: ${error.message || "Failed to send message. Please verify your connection and try again."}`
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleEditSave = async (messageId: string, index: number) => {
+        if (!editingContent.trim() || isLoading) return;
+        
+        setIsLoading(true);
+        setEditingMsgId(null);
+        
+        try {
+            const res = await editChatMessage(messageId, editingContent);
+            if (!res.success) {
+                throw new Error("Failed to save edited message");
+            }
+            
+            const updatedMessages = messages.slice(0, index + 1).map((m, idx) => {
+                if (idx === index) {
+                    return { ...m, content: editingContent };
+                }
+                return m;
+            });
+            setMessages(updatedMessages);
+            
+            const response = await fetch("/api/coach", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    message: editingContent,
+                    sessionId: sessionId,
+                }),
+            });
+
+            if (!response.ok) {
+                if (response.status === 429) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || "Rate limit reached. Please wait a minute before sending another message.");
+                }
+                throw new Error("Failed to get response after editing");
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+            setIsLoading(false);
+
+            if (reader) {
+                let accumulated = "";
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    accumulated += chunk;
+
+                    if (accumulated.includes("experiencing high community traffic")) {
+                        setStatus("rate-limited");
+                    }
+
+                    setMessages((prev) => {
+                        const updated = [...prev];
+                        if (updated.length > 0) {
+                            updated[updated.length - 1] = {
+                                role: "assistant",
+                                content: accumulated,
+                            };
+                        }
+                        return updated;
+                    });
+                }
+                
+                if (sessionId) {
+                    const res = await getChatSession(sessionId);
+                    if (res.success && res.messages) {
+                        setMessages(res.messages);
+                    }
+                }
+            }
+        } catch (error: any) {
+            console.error("Error editing message:", error);
+            const errorMessage: Message = {
+                role: "assistant",
+                content: `⚠️ **Error**: ${error.message || "Failed to update response. Please try again."}`
             };
             setMessages((prev) => [...prev, errorMessage]);
         } finally {
@@ -167,11 +522,11 @@ export default function AICoachChat({
         const lines = content.split("\n");
         
         return (
-            <div className="space-y-1">
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {lines.map((line, lineIndex) => {
                     // Horizontal rule
                     if (line.trim() === "---") {
-                        return <hr key={lineIndex} className="border-zinc-800/80 my-4" />;
+                        return <hr key={lineIndex} style={{ borderColor: "rgba(0,0,0,0.1)", margin: "14px 0" }} />;
                     }
                     
                     // Headers (### Header)
@@ -183,10 +538,11 @@ export default function AICoachChat({
                             <div 
                                 key={lineIndex} 
                                 style={{ 
-                                    fontSize: level === 3 ? "16px" : "18px", 
+                                    fontSize: level <= 2 ? "17px" : "15px", 
                                     fontWeight: "700",
-                                    marginTop: "16px",
-                                    marginBottom: "8px",
+                                    marginTop: "18px",
+                                    marginBottom: "6px",
+                                    lineHeight: 1.4,
                                     color: isUser ? "#09090b" : "#18181b"
                                 }}
                             >
@@ -200,21 +556,21 @@ export default function AICoachChat({
                     if (bulletMatch) {
                         const text = bulletMatch[2];
                         return (
-                            <div key={lineIndex} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginLeft: "8px", marginBottom: "4px" }}>
-                                <span style={{ color: isUser ? "#09090b" : "#e7b605", marginTop: "2px" }}>•</span>
-                                <span className="flex-1">{renderInlineFormatting(text, isUser)}</span>
+                            <div key={lineIndex} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginLeft: "6px", marginBottom: "6px" }}>
+                                <span style={{ color: isUser ? "#09090b" : "#e7b605", marginTop: "4px", flexShrink: 0 }}>•</span>
+                                <span style={{ flex: 1, fontSize: "15px", lineHeight: 1.65 }}>{renderInlineFormatting(text, isUser)}</span>
                             </div>
                         );
                     }
                     
                     // Empty lines (spacing)
                     if (line.trim() === "") {
-                        return <div key={lineIndex} className="h-2" />;
+                        return <div key={lineIndex} style={{ height: "8px" }} />;
                     }
                     
                     // Standard paragraphs
                     return (
-                        <p key={lineIndex} className="leading-[1.7] text-[14.5px]">
+                        <p key={lineIndex} style={{ fontSize: "15px", lineHeight: 1.65, margin: 0 }}>
                             {renderInlineFormatting(line, isUser)}
                         </p>
                     );
@@ -225,18 +581,36 @@ export default function AICoachChat({
 
     const renderChatWorkspace = () => {
         return (
-            <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                {/* Header - Glassmorphism Light Mode */}
-                <div style={{ paddingLeft: "28px", paddingRight: "28px", paddingTop: "20px", paddingBottom: "20px" }} className="bg-white/95 backdrop-blur-xl border-b border-zinc-100 flex items-center justify-between z-10 relative flex-shrink-0">
-                    <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", position: "relative" }}>
+                {/* Header */}
+                <div style={{ paddingLeft: "28px", paddingRight: "28px", paddingTop: "18px", paddingBottom: "18px", background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E4E4E7", display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 10, flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                        {showSessionsSidebar && !isSessionsOpen && (
+                            <button
+                                type="button"
+                                onClick={() => setIsSessionsOpen(true)}
+                                title="Expand history"
+                                className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all cursor-pointer border border-zinc-200 shadow-sm active:scale-95"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        )}
                         <div style={{ borderRadius: "50%" }} className="w-11 h-11 bg-gradient-to-tr from-[#9b7011] to-[#e7b605] flex items-center justify-center text-zinc-950 shadow-sm flex-shrink-0">
                             <Sparkles size={20} />
                         </div>
                         <div className="flex flex-col" style={{ gap: "8px" }}>
                             <h2 className="font-bold text-[16px] text-zinc-900 tracking-tight leading-none font-sans">Founders Edge Coach</h2>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
-                                <p className="text-[11px] text-zinc-500 font-semibold leading-none uppercase tracking-wider font-sans">Online</p>
+                                <span 
+                                    className={`w-2 h-2 rounded-full ${
+                                        status === "online" 
+                                            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" 
+                                            : "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"
+                                    }`}
+                                ></span>
+                                <p className="text-[11px] text-zinc-500 font-semibold leading-none uppercase tracking-wider font-sans">
+                                    {status === "online" ? "Online" : "Busy"}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -251,20 +625,23 @@ export default function AICoachChat({
                         </button>
                     ) : (
                         !isWidget && (
-                            <button
-                                type="button"
-                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                className="px-4 py-2 border border-[#e7b605]/30 hover:border-[#e7b605] bg-gradient-to-tr from-[#9b7011]/5 to-[#e7b605]/10 text-zinc-800 hover:text-zinc-950 rounded-full transition-all font-sans font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-[0_2px_10px_rgba(231,182,5,0.15)] active:scale-95"
-                            >
-                                <Trophy size={14} className="text-[#e7b605]" />
-                                <span>{isSidebarOpen ? "Hide Scorecard" : "View Scorecard"}</span>
-                            </button>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                    style={{ borderRadius: "99px", padding: "8px 20px", whiteSpace: "nowrap" }}
+                                    className="border border-[#dca804] bg-[#e7b605] text-zinc-950 hover:bg-[#dca804] transition-all font-sans font-semibold text-[13px] inline-flex items-center gap-2 cursor-pointer active:scale-95"
+                                >
+                                    <Trophy size={14} />
+                                    <span>{isSidebarOpen ? "Hide Scorecard" : "View Scorecard"}</span>
+                                </button>
+                            </div>
                         )
                     )}
                 </div>
 
-                {/* Message / Hero Container */}
-                <div className="flex-1 overflow-y-auto bg-[#f4f7fb] scrollbar-thin flex flex-col">
+                {/* Scrollable message / hero area — always flex-1 */}
+                <div style={{ flex: 1, overflowY: "auto", background: "#f4f7fb", display: "flex", flexDirection: "column" }}>
 
                     {messages.length === 0 ? (
                         /* ── EMPTY STATE: full-height centered hero ── */
@@ -333,67 +710,6 @@ export default function AICoachChat({
                                     </button>
                                 ))}
                             </div>
-
-                            {/* ── Input directly under buttons ── */}
-                            <form
-                                onSubmit={(e) => handleSend(e)}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    minHeight: "48px",
-                                    padding: "12px 18px",
-                                    border: `1.5px solid ${isFocused ? "#e7b605" : "#e4e4e7"}`,
-                                    borderRadius: "24px",
-                                    backgroundColor: "#ffffff",
-                                    boxShadow: isFocused
-                                        ? "0 8px 24px rgba(231,182,5,0.12)"
-                                        : "0 2px 8px rgba(9,9,11,0.05)",
-                                    transition: "border-color 0.2s, box-shadow 0.2s",
-                                    width: "100%",
-                                    maxWidth: "600px",
-                                }}
-                            >
-                                <button
-                                    type="button"
-                                    style={{ flexShrink: 0, marginLeft: "4px" }}
-                                    className="p-1.5 text-zinc-400 hover:text-[#e7b605] transition-colors cursor-pointer rounded-full hover:bg-zinc-100/80"
-                                    aria-label="Add attachment"
-                                >
-                                    <Plus size={20} strokeWidth={2} />
-                                </button>
-                                <textarea
-                                    ref={textareaRef}
-                                    value={input}
-                                    onChange={(e) => { setInput(e.target.value); autoGrow(); }}
-                                    onFocus={() => setIsFocused(true)}
-                                    onBlur={() => setIsFocused(false)}
-                                    placeholder="Type your message..."
-                                    rows={1}
-                                    style={{
-                                        width: "100%",
-                                        border: "none",
-                                        outline: "none",
-                                        boxShadow: "none",
-                                        resize: "none",
-                                        background: "transparent",
-                                        fontSize: "15px",
-                                        fontFamily: "inherit",
-                                        fontWeight: 500,
-                                        color: "#18181b",
-                                        overflow: "hidden",
-                                        lineHeight: "1.5",
-                                    }}
-                                    className="placeholder-zinc-400 !border-none !outline-none !shadow-none"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSend(e as unknown as React.FormEvent);
-                                            if (textareaRef.current) textareaRef.current.style.height = "auto";
-                                        }
-                                    }}
-                                />
-                            </form>
                         </div>
 
                     ) : (
@@ -404,6 +720,8 @@ export default function AICoachChat({
                                     const isUser = msg.role === "user";
                                     const prevMsg = index > 0 ? messages[index - 1] : null;
                                     const isSpeakerChange = prevMsg && prevMsg.role !== msg.role;
+                                    const { cleanText, resources } = parseResources(msg.content);
+
                                     return (
                                         <div
                                             key={index}
@@ -448,32 +766,121 @@ export default function AICoachChat({
                                                 )}
                                             </div>
 
-                                            {/* Message bubble */}
-                                            <div
-                                                style={{
-                                                    padding: "14px 18px",
-                                                    borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                                                    background: isUser
-                                                        ? "linear-gradient(145deg, #2D2006 0%, #1C1408 100%)"
-                                                        : msg.content.startsWith("⚠️")
-                                                            ? "#FEF2F2"
-                                                            : "#ffffff",
-                                                    border: isUser
-                                                        ? "1px solid rgba(197,160,89,0.25)"
-                                                        : msg.content.startsWith("⚠️")
-                                                            ? "1px solid #FECACA"
-                                                            : "1px solid #E4E4E7",
-                                                    boxShadow: isUser
-                                                        ? "0 4px 16px rgba(28,20,8,0.18)"
-                                                        : "0 2px 8px rgba(0,0,0,0.04)",
-                                                    color: isUser ? "#F5EDD6" : msg.content.startsWith("⚠️") ? "#991B1B" : "#18181b",
-                                                    fontSize: "14.5px",
-                                                    lineHeight: "1.7",
-                                                    fontWeight: isUser ? 500 : 400,
-                                                }}
-                                                className="font-sans"
-                                            >
-                                                {formatMessageContent(msg.content, isUser)}
+                                            {/* Message bubble container */}
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <div
+                                                    style={{
+                                                        padding: "14px 18px",
+                                                        borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                                                        background: isUser
+                                                            ? "linear-gradient(145deg, #2D2006 0%, #1C1408 100%)"
+                                                            : msg.content.startsWith("⚠️")
+                                                                ? "#FEF2F2"
+                                                                : "#ffffff",
+                                                        border: isUser
+                                                            ? "1px solid rgba(197,160,89,0.25)"
+                                                            : msg.content.startsWith("⚠️")
+                                                                ? "1px solid #FECACA"
+                                                                : "1px solid #E4E4E7",
+                                                        boxShadow: isUser
+                                                            ? "0 4px 16px rgba(28,20,8,0.18)"
+                                                            : "0 2px 8px rgba(0,0,0,0.04)",
+                                                        color: isUser ? "#F5EDD6" : msg.content.startsWith("⚠️") ? "#991B1B" : "#18181b",
+                                                        fontSize: "14.5px",
+                                                        lineHeight: "1.7",
+                                                        fontWeight: isUser ? 500 : 400,
+                                                    }}
+                                                    className="font-sans"
+                                                >
+                                                    {isUser && editingMsgId === msg.id ? (
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                                            <textarea
+                                                                value={editingContent}
+                                                                onChange={(e) => setEditingContent(e.target.value)}
+                                                                style={{
+                                                                    width: "100%",
+                                                                    background: "rgba(0,0,0,0.3)",
+                                                                    border: "1px solid rgba(197,160,89,0.4)",
+                                                                    borderRadius: "8px",
+                                                                    color: "#F5EDD6",
+                                                                    padding: "8px",
+                                                                    fontSize: "14px",
+                                                                    outline: "none",
+                                                                    resize: "vertical",
+                                                                    minHeight: "60px",
+                                                                    fontFamily: "inherit"
+                                                                }}
+                                                            />
+                                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditingMsgId(null)}
+                                                                    style={{
+                                                                        fontSize: "12px",
+                                                                        padding: "4px 10px",
+                                                                        borderRadius: "6px",
+                                                                        background: "rgba(255,255,255,0.15)",
+                                                                        color: "#F5EDD6",
+                                                                        border: "none",
+                                                                        cursor: "pointer"
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleEditSave(msg.id!, index)}
+                                                                    disabled={isLoading}
+                                                                    style={{
+                                                                        fontSize: "12px",
+                                                                        padding: "4px 10px",
+                                                                        borderRadius: "6px",
+                                                                        background: "#e7b605",
+                                                                        color: "#1C1408",
+                                                                        border: "none",
+                                                                        fontWeight: "bold",
+                                                                        cursor: "pointer"
+                                                                    }}
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        formatMessageContent(cleanText, isUser)
+                                                    )}
+                                                </div>
+                                                {isUser && msg.id && editingMsgId !== msg.id && (
+                                                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "6px", marginRight: "10px" }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingMsgId(msg.id!);
+                                                                setEditingContent(msg.content);
+                                                            }}
+                                                            style={{
+                                                                fontSize: "11px",
+                                                                color: "#9b7011",
+                                                                background: "#FFF8E7",
+                                                                border: "1px solid rgba(231,182,5,0.3)",
+                                                                borderRadius: "99px",
+                                                                padding: "3px 10px",
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                gap: "4px",
+                                                                cursor: "pointer",
+                                                                boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                                                                transition: "all 0.15s ease",
+                                                                fontWeight: 600
+                                                            }}
+                                                            className="hover:text-[#b48600] hover:border-[#dca804] hover:bg-amber-100/50"
+                                                        >
+                                                            <Pencil size={10} />
+                                                            <span>Edit</span>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {!isUser && renderResourceCards(resources)}
                                             </div>
                                         </div>
                                     );
@@ -494,8 +901,20 @@ export default function AICoachChat({
                                         <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm shadow-sm overflow-hidden border border-zinc-200 bg-white text-zinc-400">
                                             <Bot size={14} className="text-[#e7b605]" />
                                         </div>
-                                        <div className="bg-white border border-zinc-200/80 text-zinc-400 rounded-3xl rounded-bl-sm px-5 py-4 text-[14px] shadow-sm flex items-center space-x-2 font-sans">
-                                            <span className="font-semibold text-zinc-400 animate-pulse text-[10px] uppercase tracking-wider mr-1">Analyzing</span>
+                                        <div 
+                                            style={{
+                                                background: "#fefce8",
+                                                border: "1px solid #fde68a",
+                                                borderRadius: "16px 16px 16px 4px",
+                                                padding: "12px 20px",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "10px"
+                                            }}
+                                            className="font-sans"
+                                        >
+                                            <span style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", color: "#9b7011" }} className="animate-pulse">Analyzing</span>
                                             <span className="flex space-x-1">
                                                 <span className="w-1.5 h-1.5 bg-[#e7b605] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                                                 <span className="w-1.5 h-1.5 bg-[#e7b605] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
@@ -510,12 +929,21 @@ export default function AICoachChat({
                     )}
                 </div>
 
-                {/* Input bar — only visible during active chat */}
-                {messages.length > 0 && (
-                    <div
-                        className="bg-[#f4f7fb] flex-shrink-0 flex flex-col justify-center items-center"
-                        style={{ paddingTop: "16px", paddingBottom: "40px", paddingLeft: "24px", paddingRight: "24px" }}
-                    >
+                {/* ── Permanent bottom input bar ── */}
+                <div
+                    style={{
+                        background: "#f4f7fb",
+                        flexShrink: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        paddingTop: "16px",
+                        paddingBottom: "28px",
+                        paddingLeft: "24px",
+                        paddingRight: "24px",
+                        borderTop: messages.length > 0 ? "1px solid #E4E4E7" : "none",
+                    }}
+                >
                         <form
                             onSubmit={(e) => handleSend(e)}
                             style={{
@@ -523,7 +951,7 @@ export default function AICoachChat({
                                 alignItems: "center",
                                 gap: "8px",
                                 minHeight: "48px",
-                                padding: "12px 18px",
+                                padding: "10px 18px",
                                 border: `1.5px solid ${isFocused ? "#e7b605" : "#E4E4E7"}`,
                                 borderRadius: "24px",
                                 backgroundColor: "#ffffff",
@@ -564,6 +992,9 @@ export default function AICoachChat({
                                     color: "#18181b",
                                     overflow: "hidden",
                                     lineHeight: "1.5",
+                                    paddingTop: "2px",
+                                    paddingBottom: "2px",
+                                    margin: 0,
                                 }}
                                 className="placeholder-zinc-400 !border-none !outline-none !shadow-none"
                                 onKeyDown={(e) => {
@@ -599,8 +1030,11 @@ export default function AICoachChat({
                                 <Send size={15} style={{ color: input.trim() && !isLoading ? "#fff" : "#A1A1AA", marginLeft: "1px" }} />
                             </button>
                         </form>
-                    </div>
-                )}
+                        {/* Disclaimer banner */}
+                        <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "10px", textAlign: "center", fontFamily: "inherit", maxWidth: "600px", lineHeight: "1.4" }}>
+                            AI Coach provides general guidance only — consult a qualified professional for legal, tax, or financial decisions.
+                        </p>
+                </div>
 
             </div>
         );
@@ -608,31 +1042,32 @@ export default function AICoachChat({
 
     const renderScorecardSidebar = () => {
         const questionIcons: Record<string, React.ReactNode> = {
-            "What should I do next?": <Target size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
-            "Find me a grant": <TrendingUp size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
-            "How do I grow my team?": <Users size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
-            "How can I improve my margins?": <HelpCircle size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
+            "What local Alberta grants am I eligible for?": <TrendingUp size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
+            "How do I prepare my pitch deck for seed investors?": <Target size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
+            "What pricing strategy fits my business model?": <HelpCircle size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
+            "How do I acquire my first 100 paying customers?": <Users size={13} style={{ color: "#e7b605", flexShrink: 0 }} />,
         };
         return (
             <div 
                 style={{
-                    position: "absolute",
+                    position: (isWidget || isStandalonePage) ? "absolute" : "relative",
                     top: 0,
                     right: 0,
                     height: "100%",
-                    width: "300px",
+                    width: isSidebarOpen ? ((isWidget || isStandalonePage) ? "100%" : "340px") : "0px",
                     background: "#F9FAFB",
                     borderLeft: "1px solid #E5E7EB",
                     display: "flex",
                     flexDirection: "column",
                     overflowY: "auto",
+                    overflowX: "hidden",
                     flexShrink: 0,
                     zIndex: 30,
-                    boxShadow: "-4px 0 24px rgba(0,0,0,0.06)",
-                    transform: isSidebarOpen ? "translateX(0)" : "translateX(100%)",
+                    boxShadow: "-4px 0 24px rgba(0,0,0,0.04)",
                     opacity: isSidebarOpen ? 1 : 0,
                     pointerEvents: isSidebarOpen ? "auto" : "none",
-                    transition: "transform 0.3s ease, opacity 0.3s ease",
+                    transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease",
+                    visibility: isSidebarOpen ? "visible" : "hidden",
                 }}
             >
                 {/* Sidebar header */}
@@ -704,12 +1139,12 @@ export default function AICoachChat({
                         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                             <div style={{ fontSize: "11px", fontWeight: 800, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.08em" }}>Categories</div>
                             {Object.entries(scorecard.categories).map(([category, value]) => {
-                                const percentage = Math.min(100, Math.max(0, value * 10));
+                                const percentage = Math.min(100, Math.max(0, value));
                                 return (
                                     <div key={category}>
                                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", fontSize: "13px" }}>
                                             <span style={{ fontWeight: 600, color: "#374151" }}>{category}</span>
-                                            <span style={{ fontWeight: 700, color: "#111827" }}>{value}/10</span>
+                                            <span style={{ fontWeight: 700, color: "#111827" }}>{value}/100</span>
                                         </div>
                                         <div style={{ height: "6px", background: "#E5E7EB", borderRadius: "999px", overflow: "hidden" }}>
                                             <div style={{ width: `${percentage}%`, height: "100%", background: "linear-gradient(90deg, #9b7011 0%, #e7b605 100%)", borderRadius: "999px" }} />
@@ -786,18 +1221,93 @@ export default function AICoachChat({
     };
 
     return (
-        <div className={`flex w-full bg-white overflow-hidden font-sans relative ${
-            isWidget 
-                ? "h-full flex-col rounded-none" 
-                : "h-full flex-row w-full border border-zinc-200 rounded-none shadow-2xl"
-        }`}>
-            {isWidget ? (
-                renderChatWorkspace()
-            ) : (
-                <>
-                    {renderChatWorkspace()}
-                    {renderScorecardSidebar()}
-                </>
+        <div
+            style={{
+                display: "flex",
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                fontFamily: "inherit",
+                position: "relative",
+                background: isWidget ? "#ffffff" : "#f4f7fb",
+                flexDirection: "row",
+            }}
+        >
+            {/* Sessions History Sidebar — only on standalone page */}
+            {showSessionsSidebar && isSessionsOpen && (
+                <ChatSessionsSidebar
+                    sessions={sessions}
+                    activeSessionId={sessionId}
+                    onSelectSession={(sid) => {
+                        handleLoadSession(sid);
+                        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                            setIsSessionsOpen(false);
+                        }
+                    }}
+                    onNewChat={() => handleNewChat()}
+                    onSessionDeleted={handleSessionDeleted}
+                    onClose={() => setIsSessionsOpen(false)}
+                />
+            )}
+
+            {/* Main chat area */}
+            <div style={{ flex: 1, display: "flex", flexDirection: isWidget ? "column" : "row", overflow: "hidden", minWidth: 0 }}>
+                {isWidget ? (
+                    renderChatWorkspace()
+                ) : (
+                    <>
+                        {renderChatWorkspace()}
+                        {renderScorecardSidebar()}
+                    </>
+                )}
+            </div>
+
+            {/* New Chat Confirmation Modal */}
+            {showNewChatConfirm && (
+                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div 
+                        style={{
+                            backgroundColor: "#ffffff",
+                            borderRadius: "24px",
+                            padding: "32px",
+                            maxWidth: "380px",
+                            width: "100%",
+                            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                            border: "1px solid #f4f4f5",
+                            textAlign: "center",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center"
+                        }}
+                        className="font-sans"
+                    >
+                        <div className="w-14 h-14 rounded-2xl bg-amber-50/80 text-[#e7b605] flex items-center justify-center mb-5 border border-amber-200/60 shadow-sm">
+                            <Sparkles size={26} />
+                        </div>
+                        <h3 className="text-xl font-bold text-zinc-900 mb-2 tracking-tight">Start a new conversation?</h3>
+                        <p className="text-sm text-zinc-500 mb-7 leading-relaxed px-2 font-medium">
+                            Your current discussion is saved automatically in your sidebar history.
+                        </p>
+                        <div className="flex items-center gap-3 w-full">
+                            <button
+                                type="button"
+                                onClick={() => setShowNewChatConfirm(false)}
+                                style={{ borderRadius: "4px", padding: "10px 20px", whiteSpace: "nowrap", outline: "none" }}
+                                className="flex-1 bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-all font-sans font-semibold text-[13px] inline-flex items-center justify-center cursor-pointer active:scale-95 shadow-none"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleNewChat(true)}
+                                style={{ borderRadius: "4px", padding: "10px 20px", whiteSpace: "nowrap", outline: "none" }}
+                                className="flex-1 bg-[#e7b605] text-zinc-950 hover:bg-[#dca804] transition-all font-sans font-bold text-[13px] inline-flex items-center justify-center cursor-pointer active:scale-95 shadow-none"
+                            >
+                                New Chat
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

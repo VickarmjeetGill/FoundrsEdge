@@ -15,6 +15,7 @@ const navLinks = [
   { label: 'Awards', href: '/awards' },
   { label: 'Webinars', href: '/webinars' },
   { label: 'Supper Club', href: '/supper-club' },
+  { label: 'AI Coach', href: '/coach' },
 ];
 
 export default function Navbar() {
