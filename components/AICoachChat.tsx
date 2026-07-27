@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Sparkles, Bot, X, Plus, ChevronRight, Trophy, Paperclip, Send, Target, Users, TrendingUp, HelpCircle, Calendar, Tag, PanelLeftOpen, PanelLeftClose, Pencil } from "lucide-react";
+import { Sparkles, Bot, X, Plus, ChevronRight, Trophy, Paperclip, Send, Target, Users, TrendingUp, HelpCircle, Calendar, Tag, PanelLeftOpen, PanelLeftClose, Pencil, Copy, Check, FileText } from "lucide-react";
 import ChatSessionsSidebar, { SessionItem } from "./ChatSessionsSidebar";
 import { getChatSessions, getChatSession, editChatMessage } from "@/app/actions/chat";
 
@@ -59,8 +59,30 @@ export default function AICoachChat({
     const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
     const [editingContent, setEditingContent] = useState<string>("");
     const [status, setStatus] = useState<"online" | "rate-limited">("online");
+    const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = (event.target?.result as string) || "";
+            setAttachedFile({ name: file.name, content: text.slice(0, 8000) });
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+    };
+
+    const handleCopy = (text: string, index: number) => {
+        if (!navigator.clipboard) return;
+        navigator.clipboard.writeText(text);
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex(null), 2000);
+    };
 
     const autoGrow = () => {
         const ta = textareaRef.current;
@@ -321,8 +343,16 @@ export default function AICoachChat({
 
     const handleSend = async (e?: React.FormEvent | React.KeyboardEvent, textOverride?: string) => {
         if (e) e.preventDefault();
-        const contentToSend = textOverride || input;
-        if (!contentToSend.trim() || isLoading) return;
+        let contentToSend = textOverride || input;
+        if ((!contentToSend.trim() && !attachedFile) || isLoading) return;
+
+        if (attachedFile && !textOverride) {
+            const fileHeader = `[Attached File: ${attachedFile.name}]`;
+            contentToSend = contentToSend.trim() 
+                ? `${contentToSend.trim()}\n\n${fileHeader}\n${attachedFile.content}`
+                : `${fileHeader}\n${attachedFile.content}`;
+            setAttachedFile(null);
+        }
 
         const userMessage: Message = { role: "user", content: contentToSend };
         setMessages((prev) => [...prev, userMessage]);
@@ -441,6 +471,7 @@ export default function AICoachChat({
                 body: JSON.stringify({
                     message: editingContent,
                     sessionId: sessionId,
+                    editMode: true,
                 }),
             });
 
@@ -880,7 +911,34 @@ export default function AICoachChat({
                                                         </button>
                                                     </div>
                                                 )}
-                                                {!isUser && renderResourceCards(resources)}
+                                                {!isUser && (
+                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
+                                                         <div style={{ flex: 1 }}>{renderResourceCards(resources)}</div>
+                                                         <button
+                                                             type="button"
+                                                             onClick={() => handleCopy(cleanText, index)}
+                                                             style={{
+                                                                 fontSize: "11px",
+                                                                 color: copiedIndex === index ? "#16a34a" : "#71717a",
+                                                                 background: "#ffffff",
+                                                                 border: "1px solid #e4e4e7",
+                                                                 borderRadius: "99px",
+                                                                 padding: "3px 10px",
+                                                                 display: "inline-flex",
+                                                                 alignItems: "center",
+                                                                 gap: "4px",
+                                                                 cursor: "pointer",
+                                                                 transition: "all 0.15s ease",
+                                                                 fontWeight: 600,
+                                                                 marginLeft: "8px"
+                                                             }}
+                                                             className="hover:text-zinc-900 hover:border-zinc-300"
+                                                         >
+                                                             {copiedIndex === index ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+                                                             <span>{copiedIndex === index ? "Copied" : "Copy"}</span>
+                                                         </button>
+                                                     </div>
+                                                 )}
                                             </div>
                                         </div>
                                     );
@@ -944,6 +1002,57 @@ export default function AICoachChat({
                         borderTop: messages.length > 0 ? "1px solid #E4E4E7" : "none",
                     }}
                 >
+                        {/* Suggested Follow-up Chips */}
+                        {messages.length > 0 && !isLoading && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", justifyContent: "center", marginBottom: "12px", maxWidth: "760px", width: "100%" }}>
+                                {[
+                                    "What local Alberta grants should I apply for?",
+                                    "How do I improve my B2B pricing model?",
+                                    "How can I prepare for an investor pitch?"
+                                ].map((chipText, i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => handleSend(undefined, chipText)}
+                                        style={{
+                                            fontSize: "11px",
+                                            padding: "4px 12px",
+                                            borderRadius: "99px",
+                                            background: "#ffffff",
+                                            border: "1px solid #e4e4e7",
+                                            color: "#52525b",
+                                            fontWeight: 500,
+                                            cursor: "pointer",
+                                            transition: "all 0.15s ease",
+                                            boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+                                        }}
+                                        className="hover:border-[#e7b605] hover:text-[#9b7011] hover:bg-amber-50/50"
+                                    >
+                                        💡 {chipText}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* File Attachment Chip */}
+                        {attachedFile && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#FFF8E7", border: "1px solid rgba(231,182,5,0.4)", color: "#9b7011", fontSize: "12px", fontWeight: 600, padding: "6px 14px", borderRadius: "12px", marginBottom: "10px", maxWidth: "760px", width: "100%" }}>
+                                <FileText size={15} />
+                                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{attachedFile.name}</span>
+                                <button type="button" onClick={() => setAttachedFile(null)} className="hover:text-amber-900 cursor-pointer p-0.5">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleFileSelect} 
+                            style={{ display: "none" }} 
+                            accept=".txt,.json,.md,.csv,.pdf,.doc,.docx" 
+                        />
+
                         <form
                             onSubmit={(e) => handleSend(e)}
                             style={{
@@ -965,9 +1074,11 @@ export default function AICoachChat({
                         >
                             <button
                                 type="button"
+                                onClick={() => fileInputRef.current?.click()}
                                 style={{ flexShrink: 0, marginLeft: "4px" }}
                                 className="p-1.5 text-zinc-400 hover:text-[#e7b605] transition-colors cursor-pointer rounded-full hover:bg-zinc-100/80"
                                 aria-label="Add attachment"
+                                title="Attach text or document file"
                             >
                                 <Paperclip size={18} strokeWidth={2} />
                             </button>

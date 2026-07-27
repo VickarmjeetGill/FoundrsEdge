@@ -64,7 +64,7 @@ export async function POST(req: Request) {
         }
 
         // Parse request body
-        const { message, sessionId } = await req.json();
+        const { message, sessionId, editMode } = await req.json();
 
         if (!message) {
             return NextResponse.json({ error: "Missing message content" }, { status: 400 });
@@ -114,9 +114,12 @@ export async function POST(req: Request) {
             memberBusiness = null;
         }
 
+        // Detect if user query is asking about community, events, offers, grants, or resources
+        const isResourceQuery = /\b(event|events|meetup|meetups|offer|offers|discount|discounts|grant|grants|funding|opportunity|opportunities)\b/i.test(message);
+
         let liveContext = "\n\nREAL PLATFORM DATA IN FOUNDERS EDGE:\n";
         
-        // User Profile & Business Context
+        // User Profile & Business Context (Always included)
         if (userProfile) {
             liveContext += `User Info: Name: ${userProfile.name || 'Founder'}, Role: ${userProfile.role}\n`;
         }
@@ -124,41 +127,46 @@ export async function POST(req: Request) {
             liveContext += `User's Business: ${memberBusiness.business_name} (${memberBusiness.business_type || 'Startup'}), Description: ${memberBusiness.business_desc || 'N/A'}, Revenue: ${memberBusiness.revenue || 'N/A'}, Employees: ${memberBusiness.employees || 'N/A'}, Priorities: ${memberBusiness.priorities?.join(', ') || 'N/A'}\n`;
         }
 
-        // Scorecard Context
+        // Scorecard Context (Always included)
         if (userProfile?.scorecardSubmissions?.[0]) {
             const sc = userProfile.scorecardSubmissions[0];
             liveContext += `User's Scorecard Assessment: Overall Score ${sc.score}/100, Category breakdown: ${JSON.stringify(sc.categories)}\n`;
         }
 
-        // Live Events Context
-        if (eventsList.length > 0) {
-            liveContext += "Upcoming Platform Events:\n" + eventsList.map(e => `- ${e.title} (Category: ${e.category}, Date: ${e.date}, Location: ${e.location}) -> Format tag as [Resource: event|${e.title}|${e.id}]`).join("\n") + "\n";
-        } else {
-            liveContext += "Upcoming Platform Events: NONE currently scheduled in the database. CRITICAL: DO NOT make up or hallucinate fake event names. Inform the user that no events are currently scheduled and suggest they host/post their own using: [Resource: action|Host an Event]\n";
+        // Include Events, Offers, and Opportunities ONLY when user query is resource/community related
+        if (isResourceQuery) {
+            // Live Events Context
+            if (eventsList.length > 0) {
+                liveContext += "Upcoming Platform Events:\n" + eventsList.map(e => `- ${e.title} (Category: ${e.category}, Date: ${e.date}, Location: ${e.location}) -> Format tag as [Resource: event|${e.title}|${e.id}]`).join("\n") + "\n";
+            } else {
+                liveContext += "Upcoming Platform Events: NONE currently scheduled in the database. CRITICAL: DO NOT make up or hallucinate fake event names. Inform the user that no events are currently scheduled and suggest they host/post their own using: [Resource: action|Host an Event]\n";
+            }
+
+            // Live Offers Context
+            if (offersList.length > 0) {
+                liveContext += "Special Partner Offers & Discounts:\n" + offersList.map(o => `- ${o.title} by ${o.business_name}: ${o.description} -> Format tag as [Resource: offer|${o.title}|${o.id}]`).join("\n") + "\n";
+            } else {
+                liveContext += "Special Partner Offers: NONE currently active in the database. CRITICAL: DO NOT make up fake discount codes or partner names. Inform the user that no active partner offers are posted right now and encourage them to submit an offer using: [Resource: action|Submit an Offer]\n";
+            }
+
+            // Live Opportunities / Grants Context
+            if (oppsList.length > 0) {
+                liveContext += "Active Grants & Opportunities:\n" + oppsList.map(op => `- ${op.title} (${op.type}): ${op.description} -> Format tag as [Resource: offer|${op.title}|${op.id}]`).join("\n") + "\n";
+            } else {
+                liveContext += "Active Grants & Opportunities: NONE currently posted in the platform database. Provide general Alberta grant guidance (e.g. Alberta Innovates, CanExport, CDAP, PrairiesCan) but clarify that no specific member grant is currently listed on the platform.\n";
+            }
         }
 
-        // Live Offers Context
-        if (offersList.length > 0) {
-            liveContext += "Special Partner Offers & Discounts:\n" + offersList.map(o => `- ${o.title} by ${o.business_name}: ${o.description} -> Format tag as [Resource: offer|${o.title}|${o.id}]`).join("\n") + "\n";
-        } else {
-            liveContext += "Special Partner Offers: NONE currently active in the database. CRITICAL: DO NOT make up fake discount codes or partner names. Inform the user that no active partner offers are posted right now and encourage them to submit an offer using: [Resource: action|Submit an Offer]\n";
+        // Only save user message if NOT in editMode (edit mode means the user message already exists in DB)
+        if (!editMode) {
+            await prisma.chatMessage.create({
+                data: {
+                    sessionId: activeSessionId,
+                    role: "user",
+                    content: message,
+                },
+            });
         }
-
-        // Live Opportunities / Grants Context
-        if (oppsList.length > 0) {
-            liveContext += "Active Grants & Opportunities:\n" + oppsList.map(op => `- ${op.title} (${op.type}): ${op.description} -> Format tag as [Resource: offer|${op.title}|${op.id}]`).join("\n") + "\n";
-        } else {
-            liveContext += "Active Grants & Opportunities: NONE currently posted in the platform database. Provide general Alberta grant guidance (e.g. Alberta Innovates, CanExport, CDAP, PrairiesCan) but clarify that no specific member grant is currently listed on the platform.\n";
-        }
-
-        // Save user's message to the database first
-        const savedUserMessage = await prisma.chatMessage.create({
-            data: {
-                sessionId: activeSessionId,
-                role: "user",
-                content: message,
-            },
-        });
 
         // Retrieve recent history (last 12 messages) to optimize token usage on free tier
         const history = await prisma.chatMessage.findMany({
@@ -177,47 +185,108 @@ export async function POST(req: Request) {
 
 CRITICAL LAWS FOR RECOMMENDATIONS:
 1. ABSOLUTE GROUNDING: You MUST ONLY recommend platform events, offers, or opportunities that are explicitly listed in the "REAL PLATFORM DATA IN FOUNDERS EDGE" context section below. You MUST NEVER invent, fabricate, or hallucinate fictional event names, fake dates, or imaginary discount codes.
-2. EMPTY DATA HANDLING: If the database context specifies "NONE", or if no listed item matches the user's query, state clearly: "There are currently no upcoming events (or offers) listed on Founders Edge." Suggest they host or submit their own using [Resource: action|Host an Event] or [Resource: action|Submit an Offer].
-3. STRICT RELEVANCE: Only bring up events or partner offers if the user explicitly asks about them or if they directly solve the user's current problem.
-4. RESOURCE TAGGING FORMAT: Whenever referencing a real item from the database, format it as [Resource: type|title] (type is: event, offer, match, roadmap, or action). Always write grammatically complete, natural sentences.${liveContext}`;
+2. NO UNSOLICITED EVENT OR OFFER PLUGS: Do NOT mention, plug, or suggest platform events, discounts, partner offers, hosting events, or submitting offers UNLESS the user explicitly asks about events, discounts, grants, networking, or community resources in their message. If the user asks a business, creative, or strategic question (such as drafting a cold email, pricing, hiring, or pitch advice), fulfill their request directly and completely without adding ANY notes, disclaimers, or suggestions about platform events.
+3. RESOURCE TAGGING FORMAT: Whenever referencing a real item from the database, format it as [Resource: type|title] (type is: event, offer, match, roadmap, or action). Always write grammatically complete, natural sentences.
+4. DOCUMENT REVIEW MODE: Only perform a document analysis if the user explicitly attaches a file (containing '[Attached File: ...]') or explicitly asks you to review/critique a written document. When reviewing an attached document, give sharp, concrete feedback specific to their business model without generic fluff.${liveContext}`;
 
-        // Model list & retry loop for resilience on Free Tier
-        const candidateModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
-        let resultStream: any = null;
-        let lastMessageText = apiMessages[apiMessages.length - 1].parts[0].text;
-        let modelErr: any = null;
+        // Attempt Groq API streaming first with multi-model fallback on Groq
+        const groqApiKey = process.env.GROQ_API_KEY;
+        let isGroqSuccess = false;
+        let groqFetchResponse: Response | null = null;
 
-        for (const modelName of candidateModels) {
-            for (let attempt = 0; attempt < 2; attempt++) {
+        if (groqApiKey) {
+            const groqCandidateModels = [
+                "llama-3.3-70b-versatile",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ];
+
+            const groqMessages = [
+                { role: "system", content: systemPrompt },
+                ...history.map(msg => ({
+                    role: msg.role === "user" ? "user" : "assistant",
+                    content: msg.content
+                }))
+            ];
+
+            for (const groqModel of groqCandidateModels) {
                 try {
-                    const model = genAI.getGenerativeModel({
-                        model: modelName,
-                        systemInstruction: systemPrompt
+                    groqFetchResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${groqApiKey}`,
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            model: groqModel,
+                            messages: groqMessages,
+                            stream: true
+                        })
                     });
 
-                    const chat = model.startChat({
-                        history: apiMessages.slice(0, -1),
-                    });
-
-                    resultStream = await chat.sendMessageStream(lastMessageText);
-                    if (resultStream) break;
-                } catch (err: any) {
-                    modelErr = err;
-                    const errStr = err.message || "";
-                    if (errStr.includes("429") || errStr.includes("quota")) {
-                        // Rate limit — wait 2.5 seconds before next retry
-                        await new Promise((r) => setTimeout(r, 2500));
+                    if (groqFetchResponse.ok && groqFetchResponse.body) {
+                        isGroqSuccess = true;
+                        break;
+                    } else {
+                        const errErr = await groqFetchResponse.text().catch(() => "");
+                        console.warn(`Groq API model ${groqModel} returned status:`, groqFetchResponse.status, errErr);
+                        groqFetchResponse = null;
                     }
+                } catch (err) {
+                    console.error(`Groq API fetch exception for model ${groqModel}:`, err);
+                    groqFetchResponse = null;
                 }
             }
-            if (resultStream) break;
         }
 
-        // If Gemini API free quota is temporarily unavailable, provide a graceful fallback stream
+        // Gemini candidate model retry loop if Groq is not available or failed
+        let resultStream: any = null;
+        let modelErr: any = null;
+
+        if (!isGroqSuccess && process.env.GEMINI_API_KEY) {
+            const candidateModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+            let lastMessageText = apiMessages[apiMessages.length - 1].parts[0].text;
+
+            for (const modelName of candidateModels) {
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        const model = genAI.getGenerativeModel({
+                            model: modelName,
+                            systemInstruction: systemPrompt
+                        });
+
+                        const chat = model.startChat({
+                            history: apiMessages.slice(0, -1),
+                        });
+
+                        resultStream = await chat.sendMessageStream(lastMessageText);
+                        if (resultStream) break;
+                    } catch (err: any) {
+                        modelErr = err;
+                        const errStr = err.message || "";
+                        if (errStr.includes("API key not valid") || errStr.includes("API_KEY_INVALID")) {
+                            console.error("Gemini API Error: Invalid API key format or invalid key.", err.message);
+                            break;
+                        }
+                        if (errStr.includes("429") || errStr.includes("quota")) {
+                            await new Promise((r) => setTimeout(r, 2500));
+                        }
+                    }
+                }
+                if (resultStream || (modelErr && modelErr.message && modelErr.message.includes("API_KEY_INVALID"))) break;
+            }
+        }
+
+        // If no provider succeeded, prepare fallback message
         let fallbackMessage: string | null = null;
-        if (!resultStream) {
-            console.warn("Gemini API rate limit reached, streaming graceful coach response.");
-            fallbackMessage = `Thanks for your question! The AI Coach is currently experiencing high community traffic on the free tier. 
+        if (!isGroqSuccess && !resultStream) {
+            console.warn("AI Coach streams unavailable, sending fallback response.");
+            if (modelErr?.message?.includes("API_KEY_INVALID") || modelErr?.message?.includes("API key not valid")) {
+                fallbackMessage = `⚠️ **System Notice**: The configured \`GEMINI_API_KEY\` in your \`.env\` file is invalid or improperly formatted. 
+
+Please generate a valid API key starting with \`AIzaSy...\` from **[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)** and update your \`.env\` file.`;
+            } else {
+                fallbackMessage = `Thanks for your question! The AI Coach is currently experiencing high community traffic on the free tier. 
 
 Here is a quick recommendation while the service resets:
 - **Focus Area**: Check your **Business Scorecard** in the right sidebar to work on your next high-impact milestone.
@@ -225,6 +294,7 @@ Here is a quick recommendation while the service resets:
 - **Community Action**: If you have an event or discount for fellow founders, click [Resource: action|Host an Event] or [Resource: action|Submit an Offer].
 
 Please feel free to try your message again in a minute!`;
+            }
         }
 
         const encoder = new TextEncoder();
@@ -233,7 +303,34 @@ Please feel free to try your message again in a minute!`;
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    if (fallbackMessage) {
+                    if (isGroqSuccess && groqFetchResponse?.body) {
+                        const reader = groqFetchResponse.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = "";
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split("\n");
+                            buffer = lines.pop() || "";
+
+                            for (const line of lines) {
+                                const trimmed = line.trim();
+                                if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
+                                    try {
+                                        const json = JSON.parse(trimmed.slice(6));
+                                        const content = json.choices?.[0]?.delta?.content;
+                                        if (content) {
+                                            fullContent += content;
+                                            controller.enqueue(encoder.encode(content));
+                                        }
+                                    } catch {}
+                                }
+                            }
+                        }
+                    } else if (fallbackMessage) {
                         fullContent = fallbackMessage;
                         controller.enqueue(encoder.encode(fallbackMessage));
                     } else if (resultStream) {
