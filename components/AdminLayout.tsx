@@ -12,6 +12,7 @@ import {
   Milestone,
   Activity,
   Briefcase,
+  FileText,
   LogOut,
   Menu,
   X as CloseIcon
@@ -22,6 +23,7 @@ import { logout } from '@/app/actions/auth';
 
 type AdminTab =
   | 'dashboard'
+  | 'applications'
   | 'events'
   | 'offers'
   | 'awards'
@@ -38,6 +40,7 @@ interface AdminLayoutProps {
 
 const navItems = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Content Manager', tab: 'dashboard' },
+  { href: '/admin/applications', icon: FileText, label: 'Applications', tab: 'applications' },
   { href: '/admin/events', icon: ClipboardList, label: 'Review Events', tab: 'events' },
   { href: '/admin/offers', icon: Tag, label: 'Review Offers', tab: 'offers' },
   { href: '/admin/opportunities', icon: Briefcase, label: 'Opportunities & Grants', tab: 'opportunities' },
