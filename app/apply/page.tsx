@@ -1,7 +1,6 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Check, ArrowRight, ArrowLeft, ChevronDown, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Check, ArrowRight, ArrowLeft, ChevronDown } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import { supabase } from '@/lib/supabase';
 
@@ -16,18 +15,6 @@ const geographicFocus = ['Calgary', 'Alberta', 'National', 'International'];
 const businessTypes = ['B2B', 'B2C', 'Both'];
 
 export default function ApplyPage() {
-  return (
-    <Suspense fallback={<PageLayout><div style={{ minHeight: '60vh', background: '#f9f9f7' }} /></PageLayout>}>
-      <ApplyForm />
-    </Suspense>
-  );
-}
-
-function ApplyForm() {
-  const searchParams = useSearchParams();
-  const resubmitToken = searchParams.get('resubmit');
-  const isResubmission = !!resubmitToken;
-  const [resubmitNotes, setResubmitNotes] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     businessName: '', businessDesc: '', industry: '', website: '', revenue: '', employees: '',
@@ -39,35 +26,6 @@ function ApplyForm() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-
-  // Resubmission: load the applicant's prior answers + the admin's rejection notes.
-  // Backend contract: GET /api/applications/resubmit/:token -> { application: {...fields, reviewNotes} }
-  useEffect(() => {
-    if (!resubmitToken) return;
-    (async () => {
-      try {
-        const res = await fetch(`/api/applications/resubmit/${resubmitToken}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const app = data.application ?? data;
-        setResubmitNotes(app.reviewNotes ?? app.review_notes ?? null);
-        setForm(f => ({
-          ...f,
-          businessName: app.businessName ?? app.business_name ?? f.businessName,
-          businessDesc: app.businessDesc ?? app.business_desc ?? f.businessDesc,
-          industry:     app.industry ?? f.industry,
-          website:      app.website ?? f.website,
-          revenue:      app.revenue ?? f.revenue,
-          firstName:    app.firstName ?? app.first_name ?? f.firstName,
-          lastName:     app.lastName ?? app.last_name ?? f.lastName,
-          email:        app.email ?? f.email,
-          phone:        app.phone ?? f.phone,
-          linkedin:     app.linkedin ?? f.linkedin,
-          priorities:   Array.isArray(app.priorities) ? app.priorities : f.priorities,
-        }));
-      } catch { /* leave the form blank if the lookup fails */ }
-    })();
-  }, [resubmitToken]);
 
   const errStyle: React.CSSProperties = { color: '#c0392b', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif', fontWeight: 600 };
 
@@ -90,40 +48,6 @@ function ApplyForm() {
   const handleSubmit = async () => {
   if (!validateStep(4)) return;
   setSubmitting(true);
-
-  // Resubmission path: send the updated answers back to the existing application so the
-  // backend can flag it as "resubmitted" (its own admin category), rather than creating a new record.
-  // Backend contract: POST /api/applications/resubmit/:token  body { ...form fields } -> { success: true }
-  if (isResubmission) {
-    try {
-      const res = await fetch(`/api/applications/resubmit/${resubmitToken}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: form.firstName, lastName: form.lastName, email: form.email,
-          phone: form.phone, linkedin: form.linkedin, industry: form.industry,
-          businessName: form.businessName, businessDesc: form.businessDesc,
-          website: form.website, revenue: form.revenue, employees: form.employees,
-          businessType: form.businessType, geographicFocus: form.geographicFocus,
-          idealClientIndustries: form.idealClientIndustries,
-          referralPartnerIndustries: form.referralPartnerIndustries,
-          priorities: form.priorities, openToMatching: form.openToMatching === 'true',
-        }),
-      });
-      setSubmitting(false);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        alert(d.error || 'Failed to resubmit your application. Please try again.');
-        return;
-      }
-      setSubmitted(true);
-    } catch {
-      setSubmitting(false);
-      alert('Failed to resubmit due to a network error.');
-    }
-    return;
-  }
-
   const { data: member, error: memberError } = await supabase
     .from('members')
     .insert({
@@ -193,9 +117,9 @@ function ApplyForm() {
             <div style={{ width: 80, height: 80, background: '#e7b605', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 32px', clipPath: 'polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))' }}>
               <Check size={36} style={{ color: '#000' }} />
             </div>
-            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '48px', letterSpacing: '-0.02em', marginBottom: 16 }}>{isResubmission ? 'Application Resubmitted' : 'Application Submitted'}</h1>
+            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '48px', letterSpacing: '-0.02em', marginBottom: 16 }}>Application Submitted</h1>
             <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '18px', lineHeight: 1.8, marginBottom: 32 }}>
-              Thank you, {form.firstName}! We've {isResubmission ? 'received your updated application' : 'received your application'} for <strong>{form.businessName}</strong>. Our team reviews every application personally. Expect to hear from us within 5–7 business days.
+              Thank you, {form.firstName}! We've received your application for <strong>{form.businessName}</strong>. Our team reviews every application personally. Expect to hear from us within 5–7 business days.
             </p>
             <div style={{ background: '#f9f9f7', border: '1px solid #e2e0d8', padding: '24px', textAlign: 'left', marginBottom: 32 }}>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>What happens next?</div>
@@ -252,22 +176,6 @@ function ApplyForm() {
 
       <div style={{ padding: '60px 0', background: '#f9f9f7' }}>
         <div className="container">
-          {isResubmission && (
-            <div style={{ maxWidth: 680, margin: '0 auto 20px', background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '20px 24px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-              <RefreshCw size={20} style={{ color: '#9b7011', flexShrink: 0, marginTop: 2 }} />
-              <div>
-                <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '15px', color: '#2a2820', marginBottom: 6 }}>You're resubmitting your application</div>
-                {resubmitNotes ? (
-                  <>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#9b7011', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>What our team asked you to fix</div>
-                    <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6 }}>{resubmitNotes}</p>
-                  </>
-                ) : (
-                  <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6 }}>We've pre-filled your previous answers. Update anything you'd like and resubmit — it'll go back to our team for another review.</p>
-                )}
-              </div>
-            </div>
-          )}
           <div style={{ maxWidth: 680, margin: '0 auto', background: '#fff', border: '1px solid #e2e0d8', padding: '48px' }}>
 
             {/* Step 0: Business */}
@@ -554,7 +462,7 @@ function ApplyForm() {
                 </button>
               ) : (
                 <button onClick={handleSubmit} disabled={submitting} className="btn-primary" style={{ background: '#e7b605', opacity: submitting ? 0.6 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
-                  {submitting ? 'Submitting…' : isResubmission ? <>Resubmit Application <RefreshCw size={16} /></> : <>Submit Application <Check size={16} /></>}
+                  {submitting ? 'Submitting…' : <>Submit Application <Check size={16} /></>}
                 </button>
               )}
             </div>

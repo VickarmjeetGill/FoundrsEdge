@@ -22,7 +22,7 @@ import { useEscapeKey } from '@/components/ui/useEscapeKey';
  *     status: 'pending' | 'approved' | 'rejected', reviewNotes?, submittedAt }
  */
 
-type Status = 'pending' | 'approved' | 'rejected' | 'resubmitted';
+type Status = 'pending' | 'approved' | 'rejected';
 
 type Application = {
   id: string;
@@ -64,14 +64,13 @@ function normalize(r: any): Application {
   };
 }
 
-type TabFilter = 'All' | 'Pending' | 'Resubmitted' | 'Approved' | 'Rejected';
-const tabs: TabFilter[] = ['All', 'Pending', 'Resubmitted', 'Approved', 'Rejected'];
+type TabFilter = 'All' | 'Pending' | 'Approved' | 'Rejected';
+const tabs: TabFilter[] = ['All', 'Pending', 'Approved', 'Rejected'];
 
 const statusStyles: Record<Status, { bg: string; color: string; label: string }> = {
-  pending:     { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
-  resubmitted: { bg: 'rgba(24,111,165,0.1)', color: '#186fa5', label: 'Resubmitted' },
-  approved:    { bg: 'rgba(39,174,96,0.1)',  color: '#27ae60', label: 'Approved' },
-  rejected:    { bg: 'rgba(192,57,43,0.1)',  color: '#c0392b', label: 'Rejected' },
+  pending:  { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
+  approved: { bg: 'rgba(39,174,96,0.1)',  color: '#27ae60', label: 'Approved' },
+  rejected: { bg: 'rgba(192,57,43,0.1)',  color: '#c0392b', label: 'Rejected' },
 };
 
 type LoadState = 'loading' | 'error' | 'ready';
@@ -136,18 +135,16 @@ export default function AdminApplicationsPage() {
   }
 
   const stats = {
-    total:       apps.length,
-    pending:     apps.filter(a => a.status === 'pending').length,
-    resubmitted: apps.filter(a => a.status === 'resubmitted').length,
-    approved:    apps.filter(a => a.status === 'approved').length,
-    rejected:    apps.filter(a => a.status === 'rejected').length,
+    total:    apps.length,
+    pending:  apps.filter(a => a.status === 'pending').length,
+    approved: apps.filter(a => a.status === 'approved').length,
+    rejected: apps.filter(a => a.status === 'rejected').length,
   };
 
   const filtered = apps.filter(a => {
     const matchTab =
       tab === 'All' ||
       (tab === 'Pending' && a.status === 'pending') ||
-      (tab === 'Resubmitted' && a.status === 'resubmitted') ||
       (tab === 'Approved' && a.status === 'approved') ||
       (tab === 'Rejected' && a.status === 'rejected');
     const q = search.trim().toLowerCase();
@@ -181,7 +178,7 @@ export default function AdminApplicationsPage() {
               {rejectTarget.firstName} {rejectTarget.lastName}
             </h3>
             <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6, marginBottom: 20 }}>
-              Add notes on what the applicant should fix. These are saved with the application for follow-up.
+              Add notes on what the applicant should fix. These will be emailed to the applicant.
             </p>
             <textarea
               value={rejectNotes}
@@ -210,11 +207,10 @@ export default function AdminApplicationsPage() {
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 2, marginBottom: 32 }}>
+        <div className="grid-4" style={{ gap: 2, marginBottom: 32 }}>
           {[
             { label: 'Total', value: state === 'ready' ? stats.total : '—', color: '#2a2820' },
             { label: 'Pending Review', value: state === 'ready' ? stats.pending : '—', color: '#e67e22' },
-            { label: 'Resubmitted', value: state === 'ready' ? stats.resubmitted : '—', color: '#186fa5' },
             { label: 'Approved', value: state === 'ready' ? stats.approved : '—', color: '#27ae60' },
             { label: 'Rejected', value: state === 'ready' ? stats.rejected : '—', color: '#c0392b' },
           ].map(s => (
@@ -232,7 +228,7 @@ export default function AdminApplicationsPage() {
             <div style={{ display: 'flex' }}>
               {tabs.map(t => (
                 <button key={t} onClick={() => setTab(t)} disabled={state !== 'ready'} style={{ padding: '14px 18px', background: 'none', border: 'none', borderBottom: tab === t ? '2px solid #e7b605' : '2px solid transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', color: tab === t ? '#2a2820' : '#9a9585', cursor: state === 'ready' ? 'pointer' : 'default', marginBottom: -1, transition: 'all 0.15s', opacity: state === 'ready' ? 1 : 0.6 }}>
-                  {t}{state === 'ready' && t !== 'All' ? ` (${t === 'Pending' ? stats.pending : t === 'Resubmitted' ? stats.resubmitted : t === 'Approved' ? stats.approved : stats.rejected})` : ''}
+                  {t}{state === 'ready' && t !== 'All' ? ` (${t === 'Pending' ? stats.pending : t === 'Approved' ? stats.approved : stats.rejected})` : ''}
                 </button>
               ))}
             </div>
