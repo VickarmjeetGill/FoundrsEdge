@@ -4,7 +4,7 @@ import { Check, ArrowRight, ArrowLeft, ChevronDown } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import { supabase } from '@/lib/supabase';
 
-const steps = ['Your Business', 'Your Goals', 'Contact & Submit'];
+const steps = ['Your Business', 'Priorities', 'Ideal Client', 'Referrals & Reach', 'Contact'];
 
 const industries = ['Technology', 'Marketing & Advertising', 'Finance & Accounting', 'Legal Services', 'HR & People', 'Design & Creative', 'Health & Wellness', 'Construction & Real Estate', 'Retail & E-commerce', 'Professional Services', 'Manufacturing', 'Other'];
 
@@ -36,7 +36,7 @@ export default function ApplyPage() {
       if (!form.businessDesc.trim()) e.businessDesc = 'Please describe what your business does.';
       if (!form.industry) e.industry = 'Please select an industry.';
     }
-    if (s === 2) {
+    if (s === 4) {
       if (!form.firstName.trim()) e.firstName = 'First name is required.';
       if (!form.lastName.trim()) e.lastName = 'Last name is required.';
       if (!form.email.trim()) e.email = 'Email address is required.';
@@ -47,7 +47,7 @@ export default function ApplyPage() {
   }
 
   const handleSubmit = async () => {
-  if (!validateStep(2)) return;
+  if (!validateStep(4)) return;
   setSubmitting(true);
   const { data: member, error: memberError } = await supabase
     .from('members')
@@ -245,12 +245,16 @@ export default function ApplyPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
 
-                <div style={{ borderTop: '1px solid #e2e0d8', paddingTop: 28, marginBottom: 28 }}>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '18px', marginBottom: 4 }}>Your Ideal Client</div>
-                  <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', marginBottom: 20 }}>Help us match you with the right people.</p>
+            {/* Step 2: Ideal Client */}
+            {step === 2 && (
+              <div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '28px', marginBottom: 8 }}>Your ideal client</h2>
+                <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', marginBottom: 24 }}>Help us match you with the right people.</p>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Client Industries <span style={{ color: '#9a9585', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(select all that apply)</span></label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -311,8 +315,15 @@ export default function ApplyPage() {
                     </div>
                   </div>
                 </div>
+            )}
 
-                <div style={{ borderTop: '1px solid #e2e0d8', paddingTop: 28, marginBottom: 28 }}>
+            {/* Step 3: Referrals & Reach */}
+            {step === 3 && (
+              <div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '28px', marginBottom: 8 }}>Referrals &amp; reach</h2>
+                <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', marginBottom: 24 }}>Who sends you referrals, and where you do business. All optional.</p>
+
+                <div style={{ marginBottom: 28 }}>
                   <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '18px', marginBottom: 4 }}>Referral Partners</div>
                   <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', marginBottom: 20 }}>Who would send great referrals your way — and vice versa?</p>
 
@@ -383,8 +394,8 @@ export default function ApplyPage() {
               </div>
             )}
 
-            {/* Step 2: Contact */}
-            {step === 2 && (
+            {/* Step 4: Contact & Submit */}
+            {step === 4 && (
               <div>
                 <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '28px', marginBottom: 32 }}>Your contact details</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
