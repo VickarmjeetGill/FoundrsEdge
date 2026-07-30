@@ -857,7 +857,7 @@ export default function ScorecardPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#9a9585', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Mentors to Find</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
