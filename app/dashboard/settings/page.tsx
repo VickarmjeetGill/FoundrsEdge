@@ -47,6 +47,16 @@ export default function SettingsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const check = () => { const m = window.innerWidth < 900; setIsMobile(m); if (!m) setSidebarOpen(false); };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   // Load Member & User DB data
   useEffect(() => {
     const loadData = async () => {
@@ -305,12 +315,21 @@ export default function SettingsPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
+      {/* Mobile overlay */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 45 }} />
+      )}
       {/* Sidebar */}
-      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50 }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a' }}>
+      <aside style={{ width: 260, background: '#000', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 60, transform: (!isMobile || sidebarOpen) ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isMobile && sidebarOpen ? '0 0 40px rgba(0,0,0,0.5)' : 'none' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <Logo size="sm" />
           </Link>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4, display: 'flex' }}>
+              <CloseIcon size={20} />
+            </button>
+          )}
         </div>
 
         {/* Member Profile */}
@@ -395,12 +414,19 @@ export default function SettingsPage() {
       </aside>
 
       {/* Main Content */}
-      <main style={{ marginLeft: 260, flex: 1, padding: '0' }}>
+      <main style={{ marginLeft: isMobile ? 0 : 260, flex: 1, padding: '0', minWidth: 0 }}>
         {/* Top bar */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40 }}>
-          <div>
-            <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '22px' }}>Account Settings</h1>
-            <div style={{ fontSize: '13px', color: '#9a9585' }}>Configure your profile preferences</div>
+        <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8', padding: isMobile ? '0 16px' : '0 40px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            {isMobile && (
+              <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" style={{ background: 'none', border: '1px solid #e2e0d8', color: '#2a2820', cursor: 'pointer', padding: 8, display: 'flex', flexShrink: 0 }}>
+                <Menu size={20} />
+              </button>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: isMobile ? '18px' : '22px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Account Settings</h1>
+              <div style={{ fontSize: '13px', color: '#9a9585' }}>Configure your profile preferences</div>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button style={{ width: 40, height: 40, background: '#f9f9f7', border: '1px solid #e2e0d8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
