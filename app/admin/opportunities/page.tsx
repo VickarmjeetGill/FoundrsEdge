@@ -173,7 +173,7 @@ export default function AdminOpportunitiesPage() {
   });
 
   return (
-    <AdminLayout activeTab="dashboard">
+    <AdminLayout activeTab="opportunities">
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Header bar */}
@@ -374,10 +374,10 @@ export default function AdminOpportunitiesPage() {
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#2a2820', textTransform: 'uppercase', marginBottom: 6 }}>Deadline</label>
                   <input
+                    type="date"
                     className="input-field"
                     value={form.deadline}
                     onChange={e => setForm(prev => ({ ...prev, deadline: e.target.value }))}
-                    placeholder="e.g. July 31, 2026"
                     style={{ margin: 0 }}
                   />
                 </div>

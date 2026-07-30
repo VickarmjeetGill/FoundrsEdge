@@ -11,6 +11,7 @@ import {
   Users,
   Milestone,
   Activity,
+  Briefcase,
   LogOut,
   Menu,
   X as CloseIcon
@@ -24,6 +25,7 @@ type AdminTab =
   | 'events'
   | 'offers'
   | 'awards'
+  | 'opportunities'
   | 'flagged'
   | 'users'
   | 'roadmap'
@@ -38,6 +40,7 @@ const navItems = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Content Manager', tab: 'dashboard' },
   { href: '/admin/events', icon: ClipboardList, label: 'Review Events', tab: 'events' },
   { href: '/admin/offers', icon: Tag, label: 'Review Offers', tab: 'offers' },
+  { href: '/admin/opportunities', icon: Briefcase, label: 'Opportunities & Grants', tab: 'opportunities' },
   { href: '/admin/awards', icon: Trophy, label: 'Review Awards', tab: 'awards' },
   { href: '/admin/flagged', icon: Flag, label: 'Flagged Content', tab: 'flagged' },
   { href: '/admin/users', icon: Users, label: 'Users', tab: 'users' },

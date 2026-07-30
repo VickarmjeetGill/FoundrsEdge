@@ -679,32 +679,51 @@ function PassportOfferCard({
               </>
             )}
 
-            {/* Action button */}
-            <a 
-              href={offer.redeemUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                width: '100%',
-                background: '#2a2820',
-                color: '#fff',
-                textDecoration: 'none',
-                padding: '10px 0',
-                fontSize: '12px',
-                fontWeight: 700,
-                textAlign: 'center',
-                borderRadius: '4px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                transition: 'background 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#000'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#2a2820'}
-            >
-              Go to Booking Site <ExternalLink size={12} />
-            </a>
+            {/* Action button or description */}
+            {offer.redeemUrl && offer.redeemUrl !== '#' ? (
+              <a 
+                href={offer.redeemUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  width: '100%',
+                  background: '#2a2820',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  padding: '10px 0',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  borderRadius: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#000'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#2a2820'}
+              >
+                Go to Booking Site <ExternalLink size={12} />
+              </a>
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  padding: '10px 12px',
+                  fontSize: '11px',
+                  color: '#a09d94',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                  lineHeight: 1.4,
+                }}
+              >
+                <Info size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4, color: '#e7b605' }} />
+                Present this code directly in person or during checkout with the provider.
+              </div>
+            )}
           </div>
         )}
       </div>

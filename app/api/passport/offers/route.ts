@@ -41,7 +41,7 @@ export async function GET() {
                 discountedPrice: dbOffer.type === 'percentage' ? `${dbOffer.discount_value}% off` : dbOffer.type === 'fixed' ? `$${dbOffer.discount_value} off` : dbOffer.type === 'bogo' ? 'Buy 1 Get 1 Free' : dbOffer.discount_value || 'Special Offer',
                 savingValue: dbOffer.discount_value && dbOffer.type === 'percentage' ? `${dbOffer.discount_value}% OFF` : 'EXCLUSIVES',
                 promoCode: dbOffer.promo_code || dbOffer.discount_value || 'FE-PASSPORT',
-                redeemUrl: dbOffer.events_page_url || 'https://foundersedge.com',
+                redeemUrl: dbOffer.events_page_url || '',
                 howToRedeem: dbOffer.how_to_redeem || 'Apply code during booking registration.'
             };
         });

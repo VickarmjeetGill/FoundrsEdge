@@ -29,8 +29,12 @@ export function computeProfileCompletion(basics: CompletionBasics): CompletionRe
   let biz: any = null;
   let owner: any = null;
   if (typeof window !== 'undefined') {
-    try { biz = JSON.parse(localStorage.getItem('fe_my_biz_profile') || 'null'); } catch {}
-    try { owner = JSON.parse(localStorage.getItem('fe_my_owner_profile') || 'null'); } catch {}
+    const userKey = basics.email ? basics.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+    const bizKey = userKey ? `fe_my_biz_profile_${userKey}` : 'fe_my_biz_profile';
+    const ownerKey = userKey ? `fe_my_owner_profile_${userKey}` : 'fe_my_owner_profile';
+
+    try { biz = JSON.parse(localStorage.getItem(bizKey) || 'null'); } catch {}
+    try { owner = JSON.parse(localStorage.getItem(ownerKey) || 'null'); } catch {}
   }
 
   const items: CompletionItem[] = [

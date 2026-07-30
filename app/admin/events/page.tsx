@@ -112,34 +112,41 @@ export default function AdminEventsPage() {
             setTotalResults(dbData.length);
           }
 
-          const mapped: AdminEvent[] = dbData.map((e: any) => ({
-            id: e.id,
-            title: e.title,
-            category: e.category,
-            host: e.guestName || e.host || "Member",
-            hostEmail: e.guestEmail || "Registered Member",
-            submissionType: e.guestEmail ? "Guest" : "Member",
-            guestName: e.guestName,
-            guestEmail: e.guestEmail,
-            guestBusiness: e.guestBusiness,
-            date: e.date,
-            time: e.time,
-            duration: e.duration || "2 Hours",
-            capacity: e.capacity || 50,
-            price: e.price,
-            submittedDate: new Date(e.created_at || Date.now()).toLocaleDateString(),
-            status: e.status.toLowerCase() as EventStatus,
-            featured: e.featured || false,
-            isOnline: e.location ? (
-              e.location.toLowerCase().includes('online') ||
-              e.location.toLowerCase().includes('zoom') ||
-              e.location.toLowerCase().includes('meeting link') ||
-              e.location.toLowerCase().includes('provided upon registration')
-            ) : false,
-            location: e.location,
-            description: e.description,
-            tags: e.tags && e.tags.length > 0 ? e.tags : [e.category]
-          }));
+          const mapped: AdminEvent[] = dbData.map((e: any) => {
+            const guestEmail = e.guest_email || e.guestEmail;
+            const guestName = e.guest_name || e.guestName;
+            const guestBusiness = e.guest_business || e.guestBusiness;
+            const isGuest = Boolean(guestEmail || guestName || guestBusiness);
+
+            return {
+              id: e.id,
+              title: e.title,
+              category: e.category,
+              host: guestName || e.host || "Member",
+              hostEmail: guestEmail || "Registered Member",
+              submissionType: isGuest ? "Guest" : "Member",
+              guestName: guestName,
+              guestEmail: guestEmail,
+              guestBusiness: guestBusiness,
+              date: e.date,
+              time: e.time,
+              duration: e.duration || "2 Hours",
+              capacity: e.capacity || 50,
+              price: e.price,
+              submittedDate: new Date(e.created_at || Date.now()).toLocaleDateString(),
+              status: e.status.toLowerCase() as EventStatus,
+              featured: e.featured || false,
+              isOnline: e.location ? (
+                e.location.toLowerCase().includes('online') ||
+                e.location.toLowerCase().includes('zoom') ||
+                e.location.toLowerCase().includes('meeting link') ||
+                e.location.toLowerCase().includes('provided upon registration')
+              ) : false,
+              location: e.location,
+              description: e.description,
+              tags: e.tags && e.tags.length > 0 ? e.tags : [e.category]
+            };
+          });
           setEvents(mapped);
           persistApproved(mapped);
         }
@@ -324,8 +331,8 @@ export default function AdminEventsPage() {
                           <Star size={9} fill="#9b7011" /> Featured
                         </span>
                       )}
-                      {event.guestName || event.guestEmail ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', background: '#eae8e1', color: '#5a5650', padding: '2px 8px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 2 }}>
+                      {event.submissionType === 'Guest' ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff3cd', color: '#856404', padding: '2px 8px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 2 }}>
                           Guest Submission
                         </span>
                       ) : (

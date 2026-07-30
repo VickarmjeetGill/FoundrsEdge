@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { Bell, Settings, Calendar, Building2, Users, BookOpen, Trophy, Star, ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User, Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Bell, Settings, Calendar, Building2, Users, BookOpen, Trophy, Star, ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User, Upload, Check, AlertCircle, Loader2, Rss, Bot, BarChart2, CheckCircle, Tag, UserCircle, Menu, X as CloseIcon } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
@@ -18,12 +18,18 @@ const defaultMember = {
 };
 
 const navItems = [
+  { icon: Rss, label: 'Feed', href: '/dashboard?tab=feed' },
   { icon: TrendingUp, label: 'Dashboard', href: '/dashboard' },
-  { icon: Calendar, label: 'Events', href: '/events' },
-  { icon: Building2, label: 'Directory', href: '/directory' },
+  { icon: Bot, label: 'AI Business Coach', href: '/dashboard?tab=coach' },
+  { icon: BarChart2, label: 'Scorecard', href: '/dashboard/scorecard' },
+  { icon: CheckCircle, label: 'My Roadmap', href: '/dashboard?tab=roadmap' },
+  { icon: Calendar, label: 'Events', href: '/dashboard?tab=events' },
+  { icon: Tag, label: 'Offers', href: '/dashboard?tab=offers' },
+  { icon: Trophy, label: 'Awards', href: '/dashboard?tab=awards' },
+  { icon: Building2, label: 'My Directory Profile', href: '/dashboard?tab=directoryProfile' },
+  { icon: UserCircle, label: 'Owners', href: '/dashboard?tab=owners' },
   { icon: Users, label: 'My Matches', href: '/dashboard?tab=matches' },
   { icon: BookOpen, label: 'Resources', href: '/resources' },
-  { icon: Trophy, label: 'Awards', href: '/awards' },
   { icon: Star, label: 'Supper Club', href: '/supper-club' },
 ];
 
@@ -82,7 +88,8 @@ export default function SettingsPage() {
             ? data.businesses[0]
             : data.businesses;
 
-          const fullName = `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() || userName;
+          const rawLastName = (data.last_name === 'Member' ? '' : data.last_name) ?? '';
+          const fullName = [data.first_name, rawLastName].filter(Boolean).join(' ').trim() || userName;
           const industry = data.industry ?? businessData?.business_type ?? 'Member';
 
           setMember({
@@ -159,7 +166,7 @@ export default function SettingsPage() {
 
     // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'File size exceeds 5MB limit.' });
+      setMessage({ type: 'error', text: 'File size exceeds the 5MB limit. Please choose a smaller image.' });
       return;
     }
 
@@ -288,6 +295,14 @@ export default function SettingsPage() {
     );
   };
 
+  const isAdmin = userProfile?.role === 'ADMIN';
+  const visibleNavItems = isAdmin
+    ? [
+        ...navItems,
+        { icon: Settings, label: 'Admin Panel', href: '/admin/dashboard' },
+      ]
+    : navItems;
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
       {/* Sidebar */}
@@ -325,7 +340,7 @@ export default function SettingsPage() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
-          {navItems.map(item => (
+          {visibleNavItems.map(item => (
             <Link key={item.label} href={item.href} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '12px 24px', textDecoration: 'none',
@@ -490,7 +505,9 @@ export default function SettingsPage() {
                   position: 'relative',
                   width: 120,
                   height: 120,
-                  border: `2px dashed ${dragActive ? '#e7b605' : '#e2e0d8'}`,
+                  border: userProfile?.avatarUrl 
+                    ? (dragActive ? '2px solid #e7b605' : 'none')
+                    : `2px dashed ${dragActive ? '#e7b605' : '#e2e0d8'}`,
                   background: dragActive ? 'rgba(231, 182, 5, 0.05)' : '#fff',
                   cursor: isUploading ? 'not-allowed' : 'pointer',
                   overflow: 'hidden',
@@ -572,7 +589,7 @@ export default function SettingsPage() {
                 </div>
                 <div style={{ fontSize: '12px', color: '#9a9585', lineHeight: 1.5 }}>
                   Drag & drop your photo or click to browse.<br />
-                  Supports JPG, PNG, or GIF. Max size 5MB.
+                  Square image recommended (e.g., 400x400px). Supports JPG, PNG, WebP, or GIF (Max size 5MB).
                 </div>
                 <input
                   type="file"

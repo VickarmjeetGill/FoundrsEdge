@@ -6,21 +6,28 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 import Logo from './Logo';
 import { getProfile } from '@/app/actions/profile';
 
-const navLinks = [
-  { label: 'Membership', href: '/membership' },
+const primaryNavLinks = [
   { label: 'Events', href: '/events' },
+  { label: 'Opportunities', href: '/opportunities' },
   { label: 'Passport', href: '/passport' },
   { label: 'Directory', href: '/directory' },
   { label: 'Resources', href: '/resources' },
+  { label: 'AI Coach', href: '/coach' },
+];
+
+const moreNavLinks = [
+  { label: 'Membership', href: '/membership' },
   { label: 'Awards', href: '/awards' },
   { label: 'Webinars', href: '/webinars' },
   { label: 'Supper Club', href: '/supper-club' },
-  { label: 'AI Coach', href: '/coach' },
 ];
+
+const allNavLinks = [...primaryNavLinks, ...moreNavLinks];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const pathname = usePathname();
@@ -74,7 +81,7 @@ export default function Navbar() {
 
         {/* Desktop Nav */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="hidden-mobile">
-          {navLinks.map(link => (
+          {primaryNavLinks.map(link => (
             <Link key={link.href} href={link.href} style={{
               padding: '8px 14px', color: pathname === link.href ? 'var(--gold)' : '#ccc',
               fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '13px',
@@ -85,6 +92,74 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+
+          {/* More + Dropdown */}
+          <div 
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setMoreOpen(true)}
+            onMouseLeave={() => setMoreOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setMoreOpen(!moreOpen)}
+              style={{
+                padding: '8px 14px',
+                color: moreNavLinks.some(l => pathname === l.href) ? 'var(--gold)' : '#ccc',
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 600,
+                fontSize: '13px',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                borderBottom: moreNavLinks.some(l => pathname === l.href) ? '2px solid var(--gold)' : '2px solid transparent',
+              }}
+            >
+              <span>More</span>
+              <ChevronDown size={14} style={{ transform: moreOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </button>
+
+            {moreOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                background: '#0d0d0d',
+                border: '1px solid #2a2a2a',
+                borderRadius: '8px',
+                padding: '8px 0',
+                minWidth: '160px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+                zIndex: 200,
+              }}>
+                {moreNavLinks.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMoreOpen(false)}
+                    style={{
+                      display: 'block',
+                      padding: '10px 16px',
+                      color: pathname === link.href ? 'var(--gold)' : '#ccc',
+                      fontFamily: 'var(--font-sans)',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      textDecoration: 'none',
+                      transition: 'background 0.2s, color 0.2s',
+                    }}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }} className="hidden-mobile">
@@ -128,7 +203,7 @@ export default function Navbar() {
           background: '#000', borderTop: '1px solid #1a1a1a',
           padding: '24px 20px',
         }}>
-          {navLinks.map(link => (
+          {allNavLinks.map(link => (
             <Link key={link.href} href={link.href} onClick={() => setOpen(false)} style={{
               display: 'block', padding: '14px 0', color: pathname === link.href ? 'var(--gold)' : '#ccc',
               fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '15px',

@@ -38,7 +38,6 @@ export default function ApplyPage() {
     }
     if (s === 2) {
       if (!form.firstName.trim()) e.firstName = 'First name is required.';
-      if (!form.lastName.trim()) e.lastName = 'Last name is required.';
       if (!form.email.trim()) e.email = 'Email address is required.';
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.';
     }

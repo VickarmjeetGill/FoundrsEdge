@@ -5,25 +5,6 @@ import { getCurrentUser } from '@/lib/session';
 
 export async function createOffer(formData: any) {
     try {
-        const existingBusiness = await prisma.businesses.findFirst({
-            where: {
-                business_name: formData.businessName,
-            },
-        });
-
-        let chosenBusinessId: string;
-
-        if (existingBusiness) {
-            chosenBusinessId = existingBusiness.id;
-        } else {
-            const newBusiness = await prisma.businesses.create({
-                data: {
-                    business_name: formData.businessName,
-                },
-            });
-            chosenBusinessId = newBusiness.id;
-        }
-
         const user = await getCurrentUser();
         if (!user) {
             return { success: false, error: 'You must be logged in to submit an offer' };
@@ -34,6 +15,27 @@ export async function createOffer(formData: any) {
         });
 
         const memberId = member ? member.id : null;
+
+        const existingBusiness = memberId ? await prisma.businesses.findFirst({
+            where: {
+                member_id: memberId,
+                business_name: formData.businessName,
+            },
+        }) : null;
+
+        let chosenBusinessId: string;
+
+        if (existingBusiness) {
+            chosenBusinessId = existingBusiness.id;
+        } else {
+            const newBusiness = await prisma.businesses.create({
+                data: {
+                    member_id: memberId,
+                    business_name: formData.businessName,
+                },
+            });
+            chosenBusinessId = newBusiness.id;
+        }
 
         const offer = await prisma.offers.create({
             data: {

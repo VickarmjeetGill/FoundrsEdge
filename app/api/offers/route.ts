@@ -51,12 +51,29 @@ export class CreateOfferDto {
             'restaurant',
             'retail',
             'professional_services',
+            'Professional Services',
+            'marketing_design',
+            'Marketing & Design',
+            'technology',
+            'Technology',
+            'finance_legal',
+            'Finance & Legal',
+            'health_wellness',
+            'Health & Wellness',
+            'events_venues',
+            'Events & Venues',
+            'retail_products',
+            'Retail & Products',
+            'food_beverage',
+            'Food & Beverage',
             'golf',
+            'Golf',
             'other',
+            'Other'
         ],
         {
             message:
-                'Discount category must be restaurant, retail, professional_services, golf, or other',
+                'Invalid discount category',
         }
     )
     discountCategory?: string;
@@ -194,9 +211,9 @@ export async function GET(request: NextRequest) {
                 where: { email: user.email },
             });
             if (!member) {
-                const nameParts = (user.name || 'Test Member').trim().split(/\s+/);
-                const firstName = nameParts[0] || 'Test';
-                const lastName = nameParts.slice(1).join(' ') || 'Member';
+                const nameParts = (user.name || 'Member').trim().split(/\s+/);
+                const firstName = nameParts[0] || 'Member';
+                const lastName = nameParts.slice(1).join(' ') || '';
                 member = await prisma.members.create({
                     data: {
                         email: user.email,
@@ -352,9 +369,9 @@ export async function POST(request: Request) {
         });
 
         if (!member) {
-            const nameParts = (user.name || 'Test Member').trim().split(/\s+/);
-            const firstName = nameParts[0] || 'Test';
-            const lastName = nameParts.slice(1).join(' ') || 'Member';
+            const nameParts = (user.name || 'Member').trim().split(/\s+/);
+            const firstName = nameParts[0] || 'Member';
+            const lastName = nameParts.slice(1).join(' ') || '';
             member = await prisma.members.create({
                 data: {
                     email: user.email,
@@ -366,7 +383,10 @@ export async function POST(request: Request) {
         const memberId = member.id;
 
         const existingBusiness = await prisma.businesses.findFirst({
-            where: { business_name: data.businessName },
+            where: {
+                member_id: memberId,
+                business_name: data.businessName,
+            },
         });
 
         let chosenBusinessId: string;
@@ -374,10 +394,33 @@ export async function POST(request: Request) {
             chosenBusinessId = existingBusiness.id;
         } else {
             const newBusiness = await prisma.businesses.create({
-                data: { business_name: data.businessName },
+                data: {
+                    member_id: memberId,
+                    business_name: data.businessName,
+                },
             });
             chosenBusinessId = newBusiness.id;
         }
+
+        const categoryMap: Record<string, string> = {
+            'Professional Services': 'professional_services',
+            'Marketing & Design': 'professional_services',
+            'Technology': 'professional_services',
+            'Finance & Legal': 'professional_services',
+            'Health & Wellness': 'other',
+            'Events & Venues': 'other',
+            'Retail & Products': 'retail',
+            'Food & Beverage': 'restaurant',
+            'Golf': 'golf',
+        };
+
+        const rawCat = data.discountCategory || data.category || '';
+        const normalizedDiscountCategory =
+            categoryMap[rawCat] ||
+            (rawCat.toLowerCase().includes('service') ? 'professional_services' :
+             rawCat.toLowerCase().includes('retail') ? 'retail' :
+             rawCat.toLowerCase().includes('food') || rawCat.toLowerCase().includes('restaurant') ? 'restaurant' :
+             rawCat.toLowerCase().includes('golf') ? 'golf' : 'other');
 
         const offer = await (prisma as any).offers.create({
             data: {
@@ -388,7 +431,7 @@ export async function POST(request: Request) {
                 type: data.type,
                 discount_value: data.discountValue || null,
                 discount_template: data.discountTemplate || null,
-                discount_category: data.discountCategory || null,
+                discount_category: normalizedDiscountCategory,
                 title: data.title,
                 description: data.description,
                 location: data.location || null,

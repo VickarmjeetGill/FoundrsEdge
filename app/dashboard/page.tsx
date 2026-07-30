@@ -60,7 +60,6 @@ const navItems: { icon: React.ElementType; label: string; section?: Section; hre
   { icon: Tag, label: 'Offers', section: 'offers' },
   { icon: Trophy, label: 'Awards', section: 'awards' },
   { icon: Building2, label: 'My Directory Profile', section: 'directoryProfile' },
-  { icon: Building2, label: 'Business', section: 'business' },
   { icon: UserCircle, label: 'Owners', section: 'owners' },
   { icon: Users, label: 'My Matches', section: 'matches' },
   { icon: BookOpen, label: 'Resources', href: '/resources' },
@@ -162,7 +161,7 @@ const bizIndustries = [
 ];
 
 // ── Business Section ─────────────────────────────────────────────
-function BusinessSection({ memberBusiness }: { memberBusiness: string }) {
+function BusinessSection({ memberBusiness, userEmail }: { memberBusiness: string; userEmail?: string }) {
   const [myProfile, setMyProfile] = useState<BusinessProfile | null>(null);
   const [allProfiles, setAllProfiles] = useState<BusinessProfile[]>([]);
   const [editMode, setEditMode] = useState(false);
@@ -171,33 +170,38 @@ function BusinessSection({ memberBusiness }: { memberBusiness: string }) {
     description: '', website: '', lookingFor: '', tags: '',
   });
 
+  const userKey = userEmail ? userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'guest';
+  const myBizKey = `fe_my_biz_profile_${userKey}`;
+
   useEffect(() => {
-    const myRaw = localStorage.getItem('fe_my_biz_profile');
+    const myRaw = localStorage.getItem(myBizKey);
     if (myRaw) {
       try {
         const p: BusinessProfile = JSON.parse(myRaw);
         setMyProfile(p);
         setForm({ name: p.name, industry: p.industry, location: p.location, description: p.description, website: p.website || '', lookingFor: p.lookingFor || '', tags: p.tags.join(', ') });
+        setEditMode(false);
       } catch { }
     } else {
+      setMyProfile(null);
       setEditMode(true);
       setForm(f => ({ ...f, name: memberBusiness !== 'Founders Edge Member' ? memberBusiness : '' }));
     }
     const allRaw = localStorage.getItem('fe_biz_profiles');
     if (allRaw) { try { setAllProfiles(JSON.parse(allRaw)); } catch { } }
-  }, [memberBusiness]);
+  }, [memberBusiness, myBizKey]);
 
   function saveProfile() {
     if (!form.name.trim() || !form.description.trim()) return;
     const profile: BusinessProfile = {
-      id: myProfile?.id || `biz_${Date.now()}`,
+      id: myProfile?.id || `biz_${userKey}_${Date.now()}`,
       name: form.name, industry: form.industry, location: form.location,
       description: form.description, website: form.website,
       lookingFor: form.lookingFor,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       createdAt: myProfile?.createdAt || new Date().toISOString(),
     };
-    localStorage.setItem('fe_my_biz_profile', JSON.stringify(profile));
+    localStorage.setItem(myBizKey, JSON.stringify(profile));
     const existing: BusinessProfile[] = JSON.parse(localStorage.getItem('fe_biz_profiles') || '[]');
     const idx = existing.findIndex(p => p.id === profile.id);
     const updated = idx >= 0 ? existing.map(p => p.id === profile.id ? profile : p) : [...existing, profile];
@@ -474,7 +478,7 @@ function MatchesSection({ setConfirmModal }: { setConfirmModal: any }) {
 }
 
 // ── Owners Section ───────────────────────────────────────────────
-function OwnersSection({ memberName, memberBusiness, setConfirmModal }: { memberName: string; memberBusiness: string; setConfirmModal: any }) {
+function OwnersSection({ memberName, memberBusiness, userEmail, setConfirmModal }: { memberName: string; memberBusiness: string; userEmail?: string; setConfirmModal: any }) {
   const [myProfile, setMyProfile] = useState<OwnerProfile | null>(null);
   const [posts, setPosts] = useState<OwnerPost[]>([]);
   const [editMode, setEditMode] = useState(false);
@@ -482,15 +486,20 @@ function OwnersSection({ memberName, memberBusiness, setConfirmModal }: { member
   const [form, setForm] = useState({ name: '', title: '', business: '', bio: '', lookingFor: '', tags: '' });
   const [postForm, setPostForm] = useState({ type: 'seeking' as 'seeking' | 'offering', headline: '', details: '', tags: '' });
 
+  const userKey = userEmail ? userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'guest';
+  const myOwnerKey = `fe_my_owner_profile_${userKey}`;
+
   useEffect(() => {
-    const myRaw = localStorage.getItem('fe_my_owner_profile');
+    const myRaw = localStorage.getItem(myOwnerKey);
     if (myRaw) {
       try {
         const p: OwnerProfile = JSON.parse(myRaw);
         setMyProfile(p);
         setForm({ name: p.name, title: p.title, business: p.business, bio: p.bio, lookingFor: p.lookingFor || '', tags: p.tags.join(', ') });
+        setEditMode(false);
       } catch { }
     } else {
+      setMyProfile(null);
       setEditMode(true);
       setForm(f => ({
         ...f,
@@ -500,18 +509,18 @@ function OwnersSection({ memberName, memberBusiness, setConfirmModal }: { member
     }
     const postsRaw = localStorage.getItem('fe_owner_posts');
     if (postsRaw) { try { setPosts(JSON.parse(postsRaw)); } catch { } }
-  }, [memberName, memberBusiness]);
+  }, [memberName, memberBusiness, myOwnerKey]);
 
   function saveProfile() {
     if (!form.name.trim() || !form.bio.trim()) return;
     const profile: OwnerProfile = {
-      id: myProfile?.id || `owner_${Date.now()}`,
+      id: myProfile?.id || `owner_${userKey}_${Date.now()}`,
       name: form.name, title: form.title, business: form.business, bio: form.bio,
       lookingFor: form.lookingFor,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
       createdAt: myProfile?.createdAt || new Date().toISOString(),
     };
-    localStorage.setItem('fe_my_owner_profile', JSON.stringify(profile));
+    localStorage.setItem(myOwnerKey, JSON.stringify(profile));
     setMyProfile(profile); setEditMode(false);
   }
 
@@ -899,7 +908,8 @@ export default function DashboardPage() {
           ? data.businesses[0]
           : data.businesses;
 
-        const fullName = `${data.first_name ?? ''} ${data.last_name ?? ''}`.trim() || userName;
+        const rawLastName = (data.last_name === 'Member' ? '' : data.last_name) ?? '';
+        const fullName = [data.first_name, rawLastName].filter(Boolean).join(' ').trim() || userName;
         const industry = data.industry ?? businessData?.business_type ?? 'Member';
 
         setMember({
@@ -1367,7 +1377,6 @@ export default function DashboardPage() {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          Template:{' '}
                           {offerTemplateLabels[offer.template ?? ''] ??
                             formatOfferTemplate(offer.template)}
                         </span>
@@ -2243,9 +2252,9 @@ export default function DashboardPage() {
               {activeSection === 'events' && <EventsSection />}
               {activeSection === 'offers' && <OffersSection />}
               {activeSection === 'awards' && <AwardsSection />}
-              {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} />}
-              {activeSection === 'business' && <BusinessSection memberBusiness={member.business} />}
-              {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} setConfirmModal={setConfirmModal} />}
+              {activeSection === 'directoryProfile' && <BusinessSection memberBusiness={member.business} userEmail={userProfile?.email} />}
+              {activeSection === 'business' && <BusinessSection memberBusiness={member.business} userEmail={userProfile?.email} />}
+              {activeSection === 'owners' && <OwnersSection memberName={member.name} memberBusiness={member.business} userEmail={userProfile?.email} setConfirmModal={setConfirmModal} />}
               {activeSection === 'matches' && <MatchesSection setConfirmModal={setConfirmModal} />}
               {activeSection === 'coach' && userProfile && (
                 <div className="h-[calc(100vh-64px)] w-full">

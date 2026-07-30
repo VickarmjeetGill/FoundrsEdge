@@ -118,7 +118,7 @@ export default function AdminOffersPage() {
             isPassport: o.is_passport || false,
             passportType: o.passport_type || 'ticket',
             promoCode: o.promo_code || '',
-            submittedBy: o.members ? `${o.members.first_name} ${o.members.last_name} (${o.members.email})` : 'System / Admin'
+            submittedBy: o.members ? `${[o.members.first_name, o.members.last_name === 'Member' ? '' : o.members.last_name].filter(Boolean).join(' ')} (${o.members.email})` : 'System / Admin'
           }));
           setOffers(mapped);
 
