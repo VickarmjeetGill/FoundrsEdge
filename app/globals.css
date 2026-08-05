@@ -47,6 +47,9 @@ body {
   background-color: var(--white);
   color: var(--black);
   -webkit-font-smoothing: antialiased;
+  /* Long dynamic strings (business names, offer values, titles) wrap instead of
+     overflowing their container — keeps text from breaking mobile layouts. */
+  overflow-wrap: break-word;
 }
 
 ::-webkit-scrollbar { width: 6px; }

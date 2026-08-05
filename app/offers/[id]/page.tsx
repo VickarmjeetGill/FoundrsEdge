@@ -230,6 +230,8 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
                         fontSize: '24px',
                         fontWeight: 900,
                         lineHeight: 1.2,
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word',
                       }}
                     >
                       {offer.discount}
@@ -490,7 +492,7 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
             <div style={{ position: 'sticky', top: 100 }}>
               <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderTop: '4px solid #e7b605' }}>
                 <div style={{ padding: '32px', borderBottom: '1px solid #e2e0d8' }}>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '36px', color: '#e7b605', marginBottom: 4 }}>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: 'clamp(22px, 4vw, 36px)', color: '#e7b605', marginBottom: 4, lineHeight: 1.15, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                     {offer.discount}
                   </div>
                   <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: '#9a9585' }}>
@@ -550,7 +552,7 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
                       onMouseEnter={el => (el.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)')}
                       onMouseLeave={el => (el.currentTarget.style.boxShadow = 'none')}
                     >
-                      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '22px', color: '#e7b605', marginBottom: 6 }}>{o.discount}</div>
+                      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '22px', color: '#e7b605', marginBottom: 6, lineHeight: 1.2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{o.discount}</div>
                       <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', marginBottom: 4, color: '#2a2820' }}>{o.title}</div>
                       <div style={{ fontSize: '12px', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', marginBottom: 12 }}>By {o.businessName}</div>
                       <Link href={`/offers/${o.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#9b7011', textDecoration: 'none' }}>

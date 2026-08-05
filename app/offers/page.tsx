@@ -286,7 +286,7 @@ export default function OffersPage() {
                   </div>
 
                   {/* Discount headline */}
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '18px', color: '#e7b605', lineHeight: 1.1 }}>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '18px', color: '#e7b605', lineHeight: 1.2, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                     {offer.discount}
                   </div>
 
