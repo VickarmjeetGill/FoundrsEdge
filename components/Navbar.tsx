@@ -6,35 +6,30 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 import Logo from './Logo';
 import { getProfile } from '@/app/actions/profile';
 
-// Events is a dropdown grouping all event-type experiences.
-const eventsNavLinks = [
-  { label: 'All Events', href: '/events' },
-  { label: 'Supper Club', href: '/supper-club' },
-  { label: 'Webinars', href: '/webinars' },
-];
-
+// Supper Club and Webinars are now folded into a single Events page,
+// filterable by category — so Events is one primary nav link.
 const primaryNavLinks = [
+  { label: 'Events', href: '/events' },
+  { label: 'Membership', href: '/membership' },
   { label: 'Opportunities', href: '/opportunities' },
-  { label: 'Passport', href: '/passport' },
   { label: 'Directory', href: '/directory' },
   { label: 'Resources', href: '/resources' },
-  { label: 'AI Coach', href: '/coach' },
 ];
 
 const moreNavLinks = [
   { label: 'About Us', href: '/about' },
-  { label: 'Membership', href: '/membership' },
   { label: 'Awards', href: '/awards' },
+  { label: 'Passport', href: '/passport' },
+  { label: 'AI Coach', href: '/coach' },
 ];
 
 // Flat list used for the mobile menu.
-const allNavLinks = [...eventsNavLinks, ...primaryNavLinks, ...moreNavLinks];
+const allNavLinks = [...primaryNavLinks, ...moreNavLinks];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [eventsOpen, setEventsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const pathname = usePathname();
@@ -88,74 +83,6 @@ export default function Navbar() {
 
         {/* Desktop Nav */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="hidden-mobile">
-          {/* Events + Dropdown */}
-          <div
-            style={{ position: 'relative' }}
-            onMouseEnter={() => setEventsOpen(true)}
-            onMouseLeave={() => setEventsOpen(false)}
-          >
-            <button
-              type="button"
-              onClick={() => setEventsOpen(!eventsOpen)}
-              style={{
-                padding: '8px 14px',
-                color: eventsNavLinks.some(l => pathname === l.href) ? 'var(--gold)' : '#ccc',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: '13px',
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                borderBottom: eventsNavLinks.some(l => pathname === l.href) ? '2px solid var(--gold)' : '2px solid transparent',
-              }}
-            >
-              <span>Events</span>
-              <ChevronDown size={14} style={{ transform: eventsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </button>
-
-            {eventsOpen && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                background: '#0d0d0d',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                padding: '8px 0',
-                minWidth: '160px',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
-                zIndex: 200,
-              }}>
-                {eventsNavLinks.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setEventsOpen(false)}
-                    style={{
-                      display: 'block',
-                      padding: '10px 16px',
-                      color: pathname === link.href ? 'var(--gold)' : '#ccc',
-                      fontFamily: 'var(--font-sans)',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      textDecoration: 'none',
-                      transition: 'background 0.2s, color 0.2s',
-                    }}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
           {primaryNavLinks.map(link => (
             <Link key={link.href} href={link.href} style={{
               padding: '8px 14px', color: pathname === link.href ? 'var(--gold)' : '#ccc',

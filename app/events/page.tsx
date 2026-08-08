@@ -36,6 +36,15 @@ const categoryColors: Record<string, string> = {
 
 const categories = ['All', 'Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'];
 
+// Short explainers shown in the legend so new members understand each format.
+const eventTypeLegend: { label: string; desc: string }[] = [
+  { label: 'Networking', desc: 'Casual mixers to meet other Calgary founders and grow your circle.' },
+  { label: 'Workshop', desc: 'Hands-on sessions to build a specific skill, led by an expert.' },
+  { label: 'Webinar', desc: 'Online talks and live Q&As you can join from anywhere — no travel needed.' },
+  { label: 'Supper Club', desc: 'Intimate, curated dinners where a small group of founders connect over a meal.' },
+  { label: 'Other', desc: 'Community socials, one-offs, and everything that doesn\'t fit a box.' },
+];
+
 function getWeekRange() {
   const now = new Date();
   const start = new Date(now);
@@ -281,6 +290,26 @@ export default function EventsPage() {
               <Star size={13} fill={featuredOnly ? '#e7b605' : 'none'} stroke={featuredOnly ? '#9b7011' : '#9a9585'} />
               Featured
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Event Types Legend */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e0d8' }}>
+        <div className="container" style={{ paddingTop: 28, paddingBottom: 28 }}>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#2a2820', marginBottom: 16 }}>
+            What do the event types mean?
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+            {eventTypeLegend.map(item => (
+              <div key={item.label} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <span style={{ width: 12, height: 12, borderRadius: '50%', background: categoryColors[item.label] || '#5a5650', flexShrink: 0, marginTop: 4 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#2a2820', marginBottom: 2 }}>{item.label}</div>
+                  <div style={{ fontFamily: 'Noto Serif, serif', fontSize: '13px', color: '#5a5650', lineHeight: 1.6, overflowWrap: 'break-word' }}>{item.desc}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
