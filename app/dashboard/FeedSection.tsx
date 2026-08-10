@@ -51,8 +51,8 @@ export default function FeedSection({ memberName, memberBusiness, basics }: Prop
 
   // Recompute when member basics change (name/industry/stage/avatar load in async)
   const completion = useMemo(
-    () => computeProfileCompletion({ name: memberName, ...basics }),
-    [memberName, basics?.email, basics?.industry, basics?.stage, basics?.avatarUrl]
+    () => computeProfileCompletion({ name: memberName, ...basics }, !mounted),
+    [memberName, basics?.email, basics?.industry, basics?.stage, basics?.avatarUrl, mounted]
   );
 
   useEffect(() => {

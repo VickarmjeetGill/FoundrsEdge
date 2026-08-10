@@ -84,10 +84,18 @@ export async function GET(request: Request) {
             },
             select: {
                 id: true,
+                first_name: true,
+                last_name: true,
                 email: true,
                 phone: true,
                 stage: true,
                 industry: true,
+                businesses: {
+                    select: {
+                        id: true,
+                        business_name: true,
+                    },
+                },
             },
         });
 

@@ -260,6 +260,7 @@ model events {
   tags           String[]    @default([])
   capacity       Int         @default(50)
   duration       String      @default("2 hrs")
+  member_promo_code String?   @map("memberPromoCode")
   members        members?    @relation(fields: [member_id], references: [id], onDelete: Cascade)
 
   @@index([member_id])

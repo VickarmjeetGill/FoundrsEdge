@@ -23,6 +23,7 @@ if (globalForPrisma.prisma) {
     prisma = new PrismaClient({ adapter })
 }
 
+// Prisma Client Initialization
 export { prisma }
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

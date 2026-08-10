@@ -1,8 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, ArrowRight, ArrowLeft, ChevronDown } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
-import { supabase } from '@/lib/supabase';
 
 const steps = ['Your Business', 'Priorities', 'Ideal Client', 'Referrals & Reach', 'Contact'];
 
@@ -26,6 +25,31 @@ export default function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [prefilled, setPrefilled] = useState(false);
+  const [alreadyApproved, setAlreadyApproved] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    if (!emailParam) return;
+
+    fetch(`/api/apply?email=${encodeURIComponent(emailParam)}`)
+      .then(res => res.json())
+      .then(res => {
+        if (res.alreadyApproved) {
+          setAlreadyApproved(true);
+        }
+        if (res.found && res.data) {
+          setForm(prev => ({
+            ...prev,
+            ...res.data,
+          }));
+          setPrefilled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const errStyle: React.CSSProperties = { color: '#c0392b', fontSize: '12px', marginTop: 6, fontFamily: 'DM Sans, sans-serif', fontWeight: 600 };
 
@@ -46,53 +70,34 @@ export default function ApplyPage() {
   }
 
   const handleSubmit = async () => {
-  if (!validateStep(4)) return;
-  setSubmitting(true);
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      email: form.email,
-      phone: form.phone,
-      linkedin: form.linkedin,
-      industry: form.industry,
-    })
-    .select()
-    .single();
+    if (!validateStep(4)) return;
+    setSubmitting(true);
 
-  if (memberError) {
-    setSubmitting(false);
-    alert(memberError.message);
-    return;
-  }
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
 
-  const { error: businessError } = await supabase
-    .from('businesses')
-    .insert({
-      member_id: member.id,
-      business_name: form.businessName,
-      business_desc: form.businessDesc,
-      website: form.website,
-      revenue: form.revenue,
-      employees: form.employees,
-      business_type: form.businessType,
-      geographic_focus: form.geographicFocus,
-      ideal_client_industries: form.idealClientIndustries,
-      referral_partner_industries: form.referralPartnerIndustries,
-      priorities: form.priorities,
-      open_to_matching: form.openToMatching === 'true',
-    });
+      const data = await res.json();
+      if (!res.ok) {
+        setSubmitting(false);
+        if (data.alreadyApproved) {
+          setAlreadyApproved(true);
+          return;
+        }
+        alert(data.error || 'Failed to submit application');
+        return;
+      }
 
-  if (businessError) {
-    setSubmitting(false);
-    alert(businessError.message);
-    return;
-  }
-
-  setSubmitting(false);
-  setSubmitted(true);
-};
+      setSubmitting(false);
+      setSubmitted(true);
+    } catch (err: any) {
+      setSubmitting(false);
+      alert(err.message || 'An unexpected error occurred.');
+    }
+  };
 
   const update = (field: string, val: string | string[]) => {
     setForm(f => ({ ...f, [field]: val }));
@@ -177,6 +182,28 @@ export default function ApplyPage() {
       <div style={{ padding: '60px 0', background: '#f9f9f7' }}>
         <div className="container">
           <div style={{ maxWidth: 680, margin: '0 auto', background: '#fff', border: '1px solid #e2e0d8', padding: '48px' }}>
+            {alreadyApproved ? (
+              <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+                <div style={{ width: 64, height: 64, background: '#f0fdf4', borderRadius: '50%', color: '#16a34a', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, border: '2px solid #bbf7d0' }}>
+                  <Check size={32} />
+                </div>
+                <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '26px', color: '#111', marginBottom: 12 }}>
+                  Application Already Approved!
+                </h2>
+                <p style={{ fontFamily: 'Noto Serif, serif', color: '#666', fontSize: '15px', lineHeight: 1.6, maxWidth: 480, margin: '0 auto 28px' }}>
+                  Your membership application for <strong>{form.email || 'your email'}</strong> has already been reviewed and approved. You are an active member!
+                </p>
+                <a href="/login" style={{ display: 'inline-block', background: '#e7b605', color: '#000', padding: '14px 32px', fontWeight: 800, textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '13px' }}>
+                  Log In to Your Account →
+                </a>
+              </div>
+            ) : (
+              <>
+                {prefilled && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fef08a', color: '#92400e', padding: '12px 16px', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, marginBottom: 24, borderRadius: 4 }}>
+                    ✨ Your previous application answers have been loaded. Review and make your changes before submitting!
+                  </div>
+                )}
 
             {/* Step 0: Business */}
             {step === 0 && (
@@ -381,7 +408,7 @@ export default function ApplyPage() {
                         background: form.openToMatching === 'true' ? '#e7b605' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s',
                       }}>
-                        {form.openToMatching && <Check size={12} style={{ color: '#000' }} />}
+                        {form.openToMatching === 'true' && <Check size={12} style={{ color: '#000' }} />}
                       </div>
                       <div>
                         <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: form.openToMatching === 'true' ? '#e7b605' : '#000' }}>I&apos;m open to smart matching</div>
@@ -466,6 +493,8 @@ export default function ApplyPage() {
                 </button>
               )}
             </div>
+            </>
+          )}
           </div>
         </div>
       </div>

@@ -36,6 +36,7 @@ export type FeedNotification = {
   type: 'like' | 'comment' | 'reply' | 'system';
   message: string;
   postId?: string;
+  targetUrl?: string;
   read: boolean;
   createdAt: string;
 };

@@ -9,27 +9,23 @@ import { getProfile } from '@/app/actions/profile';
 // Supper Club and Webinars are now folded into a single Events page,
 // filterable by category — so Events is one primary nav link.
 const primaryNavLinks = [
-  { label: 'Events', href: '/events' },
   { label: 'Membership', href: '/membership' },
   { label: 'Opportunities', href: '/opportunities' },
   { label: 'Directory', href: '/directory' },
   { label: 'Resources', href: '/resources' },
-];
-
-const moreNavLinks = [
-  { label: 'About Us', href: '/about' },
   { label: 'Awards', href: '/awards' },
-  { label: 'Passport', href: '/passport' },
   { label: 'AI Coach', href: '/coach' },
 ];
 
-// Flat list used for the mobile menu.
-const allNavLinks = [...primaryNavLinks, ...moreNavLinks];
-
+const eventsNavLinks = [
+  { label: 'All Events', href: '/events' },
+  { label: 'Webinars', href: '/webinars' },
+  { label: 'Supper Club', href: '/supper-club' },
+];
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const pathname = usePathname();
@@ -67,6 +63,7 @@ export default function Navbar() {
   }, [pathname]);
 
   const isHome = pathname === '/';
+  const isEventsActive = eventsNavLinks.some(l => pathname === l.href);
 
   return (
     <nav style={{
@@ -82,67 +79,68 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} className="hidden-mobile">
-          {primaryNavLinks.map(link => (
-            <Link key={link.href} href={link.href} style={{
-              padding: '8px 14px', color: pathname === link.href ? 'var(--gold)' : '#ccc',
-              fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '13px',
-              letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
-              transition: 'color 0.2s',
-              borderBottom: pathname === link.href ? '2px solid var(--gold)' : '2px solid transparent',
-            }}>
-              {link.label}
-            </Link>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, position: 'relative' }} className="hidden-mobile">
+          {/* About Us */}
+          <Link href="/about" style={{
+            padding: '8px 10px', color: pathname === '/about' ? 'var(--gold)' : '#ccc',
+            fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '12px',
+            letterSpacing: '0.04em', textTransform: 'uppercase', textDecoration: 'none',
+            transition: 'color 0.2s',
+            borderBottom: pathname === '/about' ? '2px solid var(--gold)' : '2px solid transparent',
+            whiteSpace: 'nowrap',
+          }}>
+            About Us
+          </Link>
 
-          {/* More + Dropdown */}
+          {/* Events Dropdown */}
           <div 
             style={{ position: 'relative' }}
-            onMouseEnter={() => setMoreOpen(true)}
-            onMouseLeave={() => setMoreOpen(false)}
+            onMouseEnter={() => setEventsOpen(true)}
+            onMouseLeave={() => setEventsOpen(false)}
           >
             <button
               type="button"
-              onClick={() => setMoreOpen(!moreOpen)}
+              onClick={() => setEventsOpen(!eventsOpen)}
               style={{
-                padding: '8px 14px',
-                color: moreNavLinks.some(l => pathname === l.href) ? 'var(--gold)' : '#ccc',
+                padding: '8px 10px',
+                color: isEventsActive ? 'var(--gold)' : '#ccc',
                 fontFamily: 'var(--font-sans)',
                 fontWeight: 600,
-                fontSize: '13px',
-                letterSpacing: '0.05em',
+                fontSize: '12px',
+                letterSpacing: '0.04em',
                 textTransform: 'uppercase',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
-                borderBottom: moreNavLinks.some(l => pathname === l.href) ? '2px solid var(--gold)' : '2px solid transparent',
+                gap: '3px',
+                borderBottom: isEventsActive ? '2px solid var(--gold)' : '2px solid transparent',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span>More</span>
-              <ChevronDown size={14} style={{ transform: moreOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              <span>Events</span>
+              <ChevronDown size={13} style={{ transform: eventsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
             </button>
 
-            {moreOpen && (
+            {eventsOpen && (
               <div style={{
                 position: 'absolute',
                 top: '100%',
-                right: 0,
+                left: 0,
                 background: '#0d0d0d',
                 border: '1px solid #2a2a2a',
                 borderRadius: '8px',
                 padding: '8px 0',
-                minWidth: '160px',
+                minWidth: '170px',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
                 zIndex: 200,
               }}>
-                {moreNavLinks.map(link => (
+                {eventsNavLinks.map(link => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    onClick={() => setMoreOpen(false)}
+                    onClick={() => setEventsOpen(false)}
                     style={{
                       display: 'block',
                       padding: '10px 16px',
@@ -155,6 +153,14 @@ export default function Navbar() {
                       textDecoration: 'none',
                       transition: 'background 0.2s, color 0.2s',
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(231,182,5,0.08)';
+                      e.currentTarget.style.color = '#fff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = pathname === link.href ? 'var(--gold)' : '#ccc';
+                    }}
                   >
                     {link.label}
                   </Link>
@@ -162,6 +168,20 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {/* Remaining Primary Links */}
+          {primaryNavLinks.filter(l => l.href !== '/about').map(link => (
+            <Link key={link.href} href={link.href} style={{
+              padding: '8px 10px', color: pathname === link.href ? 'var(--gold)' : '#ccc',
+              fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '12px',
+              letterSpacing: '0.04em', textTransform: 'uppercase', textDecoration: 'none',
+              transition: 'color 0.2s',
+              borderBottom: pathname === link.href ? '2px solid var(--gold)' : '2px solid transparent',
+              whiteSpace: 'nowrap',
+            }}>
+              {link.label}
+            </Link>
+          ))}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }} className="hidden-mobile">
@@ -203,11 +223,40 @@ export default function Navbar() {
       {open && (
         <div style={{
           background: '#000', borderTop: '1px solid #1a1a1a',
-          padding: '24px 20px',
+          padding: '24px 20px', maxHeight: 'calc(100vh - 72px)', overflowY: 'auto'
         }}>
-          {allNavLinks.map(link => (
+          <Link href="/about" onClick={() => setOpen(false)} style={{
+            display: 'block', padding: '12px 0', color: pathname === '/about' ? 'var(--gold)' : '#ccc',
+            fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '15px',
+            letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
+            borderBottom: '1px solid #1a1a1a',
+          }}>
+            About Us
+          </Link>
+
+          {/* Mobile Events Section */}
+          <div style={{ borderBottom: '1px solid #1a1a1a', padding: '12px 0' }}>
+            <div style={{
+              color: isEventsActive ? 'var(--gold)' : '#888',
+              fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: '12px',
+              letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              Events
+            </div>
+            {eventsNavLinks.map(link => (
+              <Link key={link.href} href={link.href} onClick={() => setOpen(false)} style={{
+                display: 'block', padding: '8px 12px', color: pathname === link.href ? 'var(--gold)' : '#ccc',
+                fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '14px',
+                letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
+              }}>
+                • {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {primaryNavLinks.filter(l => l.href !== '/about').map(link => (
             <Link key={link.href} href={link.href} onClick={() => setOpen(false)} style={{
-              display: 'block', padding: '14px 0', color: pathname === link.href ? 'var(--gold)' : '#ccc',
+              display: 'block', padding: '12px 0', color: pathname === link.href ? 'var(--gold)' : '#ccc',
               fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: '15px',
               letterSpacing: '0.05em', textTransform: 'uppercase', textDecoration: 'none',
               borderBottom: '1px solid #1a1a1a',

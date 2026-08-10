@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile, updateProfile } from '@/app/actions/profile';
 import { computeProfileCompletion } from '../profile-completion';
+import NotificationBell from '../NotificationBell';
 
 const defaultMember = {
   name: '',
@@ -39,6 +40,11 @@ export default function SettingsPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
 
+  // Communication Preferences States
+  const [emailAlerts, setEmailAlerts] = useState(true);
+  const [inPortalAlerts, setInPortalAlerts] = useState(true);
+  const [communityDigest, setCommunityDigest] = useState(true);
+
   // UI States
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +63,21 @@ export default function SettingsPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // Load Communication Preferences from localStorage
+  useEffect(() => {
+    const prefsRaw = localStorage.getItem('fe_comm_prefs');
+    if (prefsRaw) {
+      try {
+        const p = JSON.parse(prefsRaw);
+        if (typeof p.emailAlerts === 'boolean') setEmailAlerts(p.emailAlerts);
+        if (typeof p.inPortalAlerts === 'boolean') setInPortalAlerts(p.inPortalAlerts);
+        if (typeof p.communityDigest === 'boolean') setCommunityDigest(p.communityDigest);
+      } catch (err) {
+        console.error('Error loading communication preferences:', err);
+      }
+    }
+  }, []);
+
   // Load Member & User DB data
   useEffect(() => {
     const loadData = async () => {
@@ -71,6 +92,22 @@ export default function SettingsPage() {
         setEmail(profileRes.user.email || '');
         userEmail = profileRes.user.email || '';
         userName = profileRes.user.name || 'Member';
+
+        // Load account-specific Communication Preferences
+        if (userEmail) {
+          const key = `fe_comm_prefs_${userEmail.toLowerCase()}`;
+          const prefsRaw = localStorage.getItem(key) || localStorage.getItem('fe_comm_prefs');
+          if (prefsRaw) {
+            try {
+              const p = JSON.parse(prefsRaw);
+              if (typeof p.emailAlerts === 'boolean') setEmailAlerts(p.emailAlerts);
+              if (typeof p.inPortalAlerts === 'boolean') setInPortalAlerts(p.inPortalAlerts);
+              if (typeof p.communityDigest === 'boolean') setCommunityDigest(p.communityDigest);
+            } catch (err) {
+              console.error('Error loading communication preferences:', err);
+            }
+          }
+        }
       }
 
       // 2. Fetch Supabase Member Data matching user email (to keep Sidebar consistent)
@@ -148,6 +185,13 @@ export default function SettingsPage() {
     const res = await updateProfile(formData);
     setIsSaving(false);
 
+    // Save communication preferences globally and per-email account
+    const prefsObj = { emailAlerts, inPortalAlerts, communityDigest };
+    localStorage.setItem('fe_comm_prefs', JSON.stringify(prefsObj));
+    if (email) {
+      localStorage.setItem(`fe_comm_prefs_${email.toLowerCase()}`, JSON.stringify(prefsObj));
+    }
+
     if (res.success && res.user) {
       setUserProfile(res.user);
       setMember(prev => ({
@@ -157,7 +201,7 @@ export default function SettingsPage() {
           name: res.user.name || name, email, industry: prev.industry, stage: prev.stage, avatarUrl: res.user.avatarUrl ?? userProfile?.avatarUrl,
         }).percent,
       }));
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      setMessage({ type: 'success', text: 'Profile and communication preferences updated successfully!' });
       // Clear message after 3 seconds
       setTimeout(() => setMessage(null), 3000);
     } else {
@@ -429,10 +473,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button style={{ width: 40, height: 40, background: '#f9f9f7', border: '1px solid #e2e0d8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
-              <Bell size={18} style={{ color: '#5a5650' }} />
-              <div style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, background: '#e7b605', borderRadius: '50%' }} />
-            </button>
+            <NotificationBell />
             {renderTopbarAvatar()}
           </div>
         </div>
@@ -695,6 +736,57 @@ export default function SettingsPage() {
                   letterSpacing: '0.05em'
                 }}>
                   <Star size={12} /> {userProfile?.role ?? 'MEMBER'}
+                </div>
+              </div>
+
+              {/* Communication & Notification Preferences */}
+              <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #e2e0d8' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <Bell size={18} style={{ color: '#e7b605' }} />
+                  <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '16px', margin: 0, color: '#2a2820' }}>
+                    Communication & Notification Preferences
+                  </h3>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fafaf8', border: '1px solid #e2e0d8', borderRadius: 4, cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#2a2820' }}>Email Status Alerts</div>
+                      <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 2 }}>Receive email notifications when your events or offers are approved, rejected, or expiring.</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={emailAlerts}
+                      onChange={e => setEmailAlerts(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#e7b605', cursor: 'pointer', marginLeft: 16 }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fafaf8', border: '1px solid #e2e0d8', borderRadius: 4, cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#2a2820' }}>In-Portal Notifications</div>
+                      <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 2 }}>Show real-time notifications in your dashboard activity bell and feed.</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={inPortalAlerts}
+                      onChange={e => setInPortalAlerts(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#e7b605', cursor: 'pointer', marginLeft: 16 }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: '#fafaf8', border: '1px solid #e2e0d8', borderRadius: 4, cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', color: '#2a2820' }}>Community & Event Digests</div>
+                      <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 2 }}>Receive weekly updates featuring upcoming community events and exclusive member offers.</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={communityDigest}
+                      onChange={e => setCommunityDigest(e.target.checked)}
+                      style={{ width: 18, height: 18, accentColor: '#e7b605', cursor: 'pointer', marginLeft: 16 }}
+                    />
+                  </label>
                 </div>
               </div>
 

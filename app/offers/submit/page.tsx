@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, ArrowLeft, AlertCircle, Percent, Gift, Tag, Zap } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
+import { getProfile } from '@/app/actions/profile';
+import { supabase } from '@/lib/supabase';
 import type { Offer } from '../page';
 import {
   categoryDiscountPresets,
@@ -163,6 +165,24 @@ function OfferSubmitContent() {
           setOfferCount(list.filter((o: any) => o.status !== 'rejected').length);
         }
 
+        const profileRes = await getProfile();
+        if (profileRes.success && profileRes.user && profileRes.user.email) {
+          const email = profileRes.user.email;
+          const { data } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, businesses(business_name)')
+            .eq('email', email)
+            .maybeSingle();
+
+          const bizName = (data as any)?.businesses?.[0]?.business_name;
+          if (bizName && !editId) {
+            setForm(prev => ({
+              ...prev,
+              businessName: prev.businessName || bizName,
+            }));
+          }
+        }
+
         if (!editId) return;
 
         const editRes = await fetch(`/api/offers/${editId}`);
@@ -244,8 +264,7 @@ function OfferSubmitContent() {
       ...prev,
       type: preset.offerType,
       discountValue:
-        preset.offerType === 'percentage' ||
-        preset.offerType === 'fixed'
+        preset.offerType === 'percentage' || preset.offerType === 'fixed'
           ? preset.value
           : '',
       discountUnit:
@@ -361,6 +380,8 @@ function OfferSubmitContent() {
       </div>
     );
   }
+
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -737,12 +758,15 @@ function OfferSubmitContent() {
                 >
                   {currentDiscountPresets.map(preset => {
                     const isSelected =
-                      form.type === 'percentage' &&
-                      form.discountValue === preset.value;
+                      (preset.offerType === 'percentage' && form.type === 'percentage' && form.discountValue === preset.value) ||
+                      (preset.offerType === 'fixed' && form.type === 'fixed' && form.discountValue === preset.value) ||
+                      (preset.offerType === 'custom' && form.type === 'custom' && form.customDiscount === (preset.customDiscount || preset.label)) ||
+                      (preset.offerType === 'bogo' && form.type === 'bogo');
 
                     return (
                       <label
                         key={`${form.category}-${preset.value}`}
+                        onClick={() => !atLimit && selectDiscountPreset(preset)}
                         style={{
                           position: 'relative',
                           display: 'block',
@@ -779,8 +803,12 @@ function OfferSubmitContent() {
                           style={{
                             fontFamily: 'DM Sans, sans-serif',
                             fontWeight: 900,
-                            fontSize: '28px',
-                            lineHeight: 1,
+                            fontSize: preset.label.length > 12 ? '18px' : '24px',
+                            lineHeight: 1.15,
+                            hyphens: 'none',
+                            WebkitHyphens: 'none',
+                            wordBreak: 'keep-all',
+                            overflowWrap: 'normal',
                             color: isSelected ? '#9b7011' : '#2a2820',
                             marginBottom: 10,
                             paddingRight: 24,

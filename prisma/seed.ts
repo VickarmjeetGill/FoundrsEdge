@@ -22,7 +22,6 @@ async function main() {
     // Clean up existing data to avoid unique constraint conflicts on multiple seeds
     await prisma.businesses.deleteMany({});
     await prisma.members.deleteMany({});
-    // await prisma.user.deleteMany({}); // Preserves manual test accounts
 
     console.log("👥 Seeding members and businesses...");
 
@@ -74,29 +73,50 @@ async function main() {
 
     console.log("✅ 15 Members and associated Businesses seeded successfully!");
 
-    // 3. Create a default test login account
-    console.log("🔑 Seeding default test login account...");
-    const testEmail = "admin@foundersedge.com";
-    const testPassword = "password123";
-    const hashedPassword = await bcrypt.hash(testPassword, 10);
+    // 3. Create default test login accounts
+    console.log("🔑 Seeding default test login accounts...");
+    const defaultUsers = [
+        { email: "admin@foundersedge.com", password: "password123", name: "Foundrs Edge Admin", role: "ADMIN" },
+        { email: "members@foundersedge.com", password: "password123", name: "Default Member", role: "MEMBER" }
+    ];
 
-    await prisma.user.upsert({
-        where: { email: testEmail },
-        update: {
-            password: hashedPassword,
-            role: "ADMIN"
-        },
-        create: {
-            email: testEmail,
-            password: hashedPassword,
-            name: "Default Admin",
-            role: "ADMIN"
-        }
-    });
+    for (const u of defaultUsers) {
+        const hashedPassword = await bcrypt.hash(u.password, 10);
+        await prisma.user.upsert({
+            where: { email: u.email },
+            update: {
+                name: u.name,
+                password: hashedPassword,
+                role: u.role
+            },
+            create: {
+                email: u.email,
+                password: hashedPassword,
+                name: u.name,
+                role: u.role
+            }
+        });
 
-    console.log(`✅ Default user seeded!`);
-    console.log(`👉 Login Email: ${testEmail}`);
-    console.log(`👉 Password: ${testPassword}`);
+        const nameParts = u.name.split(' ');
+        const firstName = nameParts[0] || u.name;
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        await prisma.members.upsert({
+            where: { email: u.email },
+            update: {
+                first_name: firstName,
+                last_name: lastName
+            },
+            create: {
+                email: u.email,
+                first_name: firstName,
+                last_name: lastName
+            }
+        });
+
+        console.log(`👉 ${u.role} Email: ${u.email} | Password: ${u.password}`);
+    }
+    console.log(`✅ Default users seeded successfully!`);
 
     console.log("🗺 Seeding default roadmap steps...");
     
@@ -223,6 +243,10 @@ async function main() {
         });
     }
     console.log(`✅ Seeded ${stepsData.length} roadmap steps successfully!`);
+
+    console.log("💼 Clearing opportunities...");
+    await prisma.opportunities.deleteMany({});
+    console.log("✅ Opportunities cleared successfully!");
 }
 
 main()

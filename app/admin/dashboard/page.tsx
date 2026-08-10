@@ -20,7 +20,7 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type EventItem = { id: string | number; title: string; date: string; time: string; location: string; category: string; price: string; host: string; desc: string; featured: boolean; fromSubmission?: boolean; capacity?: number; duration?: string; tags?: string[]; status?: string };
+type EventItem = { id: string | number; title: string; date: string; time: string; location: string; category: string; price: string; host: string; desc: string; featured: boolean; fromSubmission?: boolean; capacity?: number; duration?: string; tags?: string[]; status?: string; onBehalfOfMemberId?: string; memberPromoCode?: string };
 type DirectoryItem = { id: string | number; name: string; industry: string; location: string; desc: string; website: string; tags: string; featured: boolean; boosted: boolean };
 type ResourceItem = { id: string | number; title: string; category: string; url: string; tags: string; desc: string; featured: boolean };
 type AwardItem = { id: string | number; name: string; category: string; desc: string; nominationsOpen: boolean; awardDate: string; sponsor: string };
@@ -90,13 +90,14 @@ function SubmitRow({ editing, onCancel, addLabel }: { editing: boolean; onCancel
 }
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
-const blankEvent = { title: '', date: '', time: '', location: '', category: '', price: '', host: '', desc: '', featured: false, capacity: '', isOnline: false, duration: '', tags: '' };
+const blankEvent = { title: '', date: '', time: '', location: '', category: '', price: '', memberPromoCode: '', host: '', desc: '', featured: false, capacity: '', isOnline: false, duration: '', tags: '', onBehalfOfMemberId: '' };
 
 function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string) => void; setConfirmModal: any }) {
   const [items, setItems] = useState<EventItem[]>([]);
   const [form, setForm] = useState(blankEvent);
   const [errors, setErrors] = useState<Partial<Record<keyof typeof blankEvent, string>>>({});
   const [editId, setEditId] = useState<string | number | null>(null);
+  const [membersList, setMembersList] = useState<{ id: string; name: string; email: string; businessName: string }[]>([]);
 
   const set = (key: string, value: string | boolean) => {
     setForm(prevForm => ({ ...prevForm, [key]: value }));
@@ -124,6 +125,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             location: e.location,
             category: e.category,
             price: e.price || '',
+            memberPromoCode: e.member_promo_code || e.memberPromoCode || '',
             host: e.host || '',
             desc: e.description || '',
             featured: e.featured || false,
@@ -132,6 +134,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             duration: e.duration || '2 Hours',
             tags: e.tags || [],
             status: e.status || 'PENDING',
+            onBehalfOfMemberId: e.member_id || '',
           }));
           setItems(mapped);
         }
@@ -139,7 +142,35 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
         console.error("Failed to load events:", err);
       }
     }
+
+    async function loadMembers() {
+      try {
+        const res = await fetch('/api/admin/users?limit=100');
+        if (res.ok) {
+          const data = await res.json();
+          const rawUsers = Array.isArray(data) ? data : (data.users || []);
+          const mapped = rawUsers
+            .filter((u: any) => u.memberProfile)
+            .map((u: any) => {
+              const mp = u.memberProfile;
+              const hasBiz = mp.businesses && mp.businesses.length > 0 && mp.businesses[0].business_name;
+              const bName = hasBiz ? mp.businesses[0].business_name : '';
+              return {
+                id: mp.id,
+                name: `${mp.first_name || ''} ${mp.last_name || ''}`.trim() || u.name || u.email,
+                email: u.email,
+                businessName: bName,
+              };
+            });
+          setMembersList(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load members for event assignment:", err);
+      }
+    }
+
     loadEvents();
+    loadMembers();
   }, []);
 
   function handleOnlineToggle() {
@@ -229,6 +260,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             capacity: Number(form.capacity),
             duration: formattedDuration,
             tags: tagsArray,
+            memberPromoCode: form.memberPromoCode,
           })
         });
         if (res.ok) {
@@ -266,6 +298,8 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             capacity: Number(form.capacity),
             duration: formattedDuration,
             tags: tagsArray,
+            onBehalfOfMemberId: form.onBehalfOfMemberId || undefined,
+            memberPromoCode: form.memberPromoCode,
           })
         });
         if (res.ok) {
@@ -279,6 +313,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             location: created.location,
             category: created.category,
             price: created.price || '',
+            memberPromoCode: created.member_promo_code || created.memberPromoCode || '',
             host: created.host || '',
             desc: created.description || '',
             featured: created.featured || false,
@@ -315,6 +350,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
       location: item.location,
       category: item.category,
       price: item.price,
+      memberPromoCode: item.memberPromoCode || '',
       host: item.host,
       desc: item.desc,
       featured: item.featured,
@@ -322,6 +358,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
       isOnline: isOnline,
       duration: item.duration ? String(parseFloat(item.duration) || 2) : '2',
       tags: Array.isArray(item.tags) ? item.tags.join(', ') : '',
+      onBehalfOfMemberId: item.onBehalfOfMemberId || '',
     });
     setEditId(item.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -439,13 +476,49 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
           <FormError msg={errors.price} />
         </Field>
 
+        <Field label="Member Promo Code / Discount Code (15%+)">
+          <input
+            name="memberPromoCode"
+            style={getFieldStyle('memberPromoCode')}
+            value={form.memberPromoCode}
+            onChange={e => set('memberPromoCode', e.target.value)}
+            placeholder="e.g. FOUNDRS15 for 15% off"
+          />
+          <FormError msg={errors.memberPromoCode} />
+        </Field>
+
+        <Field label="Assign To Member Account (Optional)">
+          <select
+            name="onBehalfOfMemberId"
+            style={getFieldStyle('onBehalfOfMemberId')}
+            value={form.onBehalfOfMemberId}
+            onChange={e => {
+              const selectedId = e.target.value;
+              set('onBehalfOfMemberId', selectedId);
+              if (selectedId) {
+                const member = membersList.find(m => m.id === selectedId);
+                if (member) {
+                  set('host', member.businessName || member.name);
+                }
+              }
+            }}
+          >
+            <option value="">None — Posted directly as Foundrs Edge Admin</option>
+            {membersList.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.name}{m.businessName ? ` — ${m.businessName}` : ''} ({m.email})
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field label="Host / Organizer">
           <input
             name="host"
             style={getFieldStyle('host')}
             value={form.host}
             onChange={e => set('host', e.target.value)}
-            placeholder="e.g. Founders Edge"
+            placeholder="e.g. Foundrs Edge Admin"
           />
           <FormError msg={errors.host} />
         </Field>

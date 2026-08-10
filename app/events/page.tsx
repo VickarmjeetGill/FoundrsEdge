@@ -156,14 +156,22 @@ export default function EventsPage() {
   const filtered = allEvents
     .filter(e => {
       let matchDate = true;
-      if (dateFilter === 'This Week') {
+      const eventTime = parseEventDate(e.date).getTime();
+      const todayStart = new Date().setHours(0, 0, 0, 0);
+
+      if (dateFilter === 'Upcoming') {
+        matchDate = eventTime >= todayStart;
+      } else if (dateFilter === 'This Week') {
         const { start, end } = getWeekRange();
-        const d = parseEventDate(e.date);
-        matchDate = d >= start && d <= end;
+        matchDate = eventTime >= start.getTime() && eventTime <= end.getTime();
       } else if (dateFilter === 'This Month') {
         const { start, end } = getMonthRange();
-        const d = parseEventDate(e.date);
-        matchDate = d >= start && d <= end;
+        matchDate = eventTime >= start.getTime() && eventTime <= end.getTime();
+      } else if (dateFilter === 'Past Events') {
+        matchDate = eventTime < todayStart;
+      } else {
+        // Default (All Dates) shows upcoming events
+        matchDate = eventTime >= todayStart;
       }
 
       return matchDate;
@@ -265,7 +273,7 @@ export default function EventsPage() {
 
             {/* Date */}
             <select className="select-field" value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={{ width: 'auto', minWidth: 140, margin: 0 }}>
-              {['All Dates', 'This Week', 'This Month'].map(d => <option key={d}>{d}</option>)}
+              {['Upcoming', 'This Week', 'This Month', 'Past Events'].map(d => <option key={d}>{d}</option>)}
             </select>
 
             {/* Location */}

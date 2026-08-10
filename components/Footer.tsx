@@ -28,7 +28,7 @@ export default function Footer() {
           {/* Platform */}
           <div>
             <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#e7b605', marginBottom: 20 }}>Platform</div>
-            {[['Events', '/events'], ['Directory', '/directory'], ['Resources', '/resources'], ['Awards', '/awards'], ['Webinars', '/webinars'], ['Supper Club', '/supper-club']].map(([label, href]) => (
+            {[['About Us', '/about'], ['Events', '/events'], ['Directory', '/directory'], ['Resources', '/resources'], ['Awards', '/awards'], ['Webinars', '/webinars'], ['Supper Club', '/supper-club']].map(([label, href]) => (
               <Link key={href} href={href} style={{ display: 'block', color: '#888', fontSize: '14px', textDecoration: 'none', marginBottom: 12, transition: 'color 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#e7b605')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#888')}>

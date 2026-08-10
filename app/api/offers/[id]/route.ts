@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
+import { invalidateCache } from '@/lib/redis';
 
 export async function PUT(
   request: NextRequest,
@@ -21,6 +22,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const data = await request.json();
+
     const existingOffer = await prisma.offers.findUnique({
       where: { id }
     });
@@ -29,8 +32,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Offer not found' }, { status: 404 });
     }
 
-    const member = await prisma.members.findUnique({
-      where: { email: user.email },
+    const member = await prisma.members.findFirst({
+      where: { email: { equals: user.email, mode: 'insensitive' } },
     });
     const memberId = member ? member.id : null;
 
@@ -39,7 +42,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const data = await request.json();
+    const expDate = new Date(data.expiryDate);
+    if (!isNaN(expDate.getTime())) {
+      expDate.setUTCHours(23, 59, 59, 999);
+    }
 
     const updatedOffer = await prisma.offers.update({
       where: { id },
@@ -51,14 +57,17 @@ export async function PUT(
         discount_value: data.discountValue || null,
         description: data.description,
         location: data.location || null,
-        expiry_date: new Date(data.expiryDate),
+        expiry_date: expDate,
         fe_discount: data.foundersEdgeDiscount || null,
         events_page_url: data.eventsPageUrl || null,
         how_to_redeem: data.howToRedeem,
         promo_code: data.promoCode || null,
-        status: 'pending',
+        status: user.role === 'ADMIN' ? existingOffer.status : 'pending',
       },
     });
+
+    const { invalidateCache } = await import('@/lib/redis');
+    await invalidateCache();
 
     return NextResponse.json({ success: true, offer: updatedOffer });
   } catch (error: any) {
@@ -196,8 +205,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Offer not found' }, { status: 404 });
     }
 
-    const member = await prisma.members.findUnique({
-      where: { email: user.email },
+    const member = await prisma.members.findFirst({
+      where: { email: { equals: user.email, mode: 'insensitive' } },
     });
     const memberId = member ? member.id : null;
 
@@ -209,6 +218,8 @@ export async function DELETE(
     const deletedOffer = await prisma.offers.delete({
       where: { id },
     });
+
+    await invalidateCache();
 
     return NextResponse.json({ success: true, offer: deletedOffer });
   } catch (error: any) {

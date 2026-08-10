@@ -7,20 +7,22 @@ import {
   ChevronRight, TrendingUp, MessageSquare, Zap, LogOut, User,
   Plus, Pencil, Trash2, Tag, ExternalLink, CheckCircle,
   UserCircle, Globe, MapPin, Rss, Sparkles, Menu, X as CloseIcon,
-  Bot, BarChart2, Target, RefreshCw, ArrowUpRight
+  Bot, BarChart2, Target, RefreshCw, ArrowUpRight, Briefcase, Award, ShieldAlert
 } from 'lucide-react';
 import FeedSection from './FeedSection';
 import RoadmapSection from './RoadmapSection';
 import StepCard from './StepCard';
 import NotificationBell from './NotificationBell';
+import { notifyExpiredOffer, notifyEndedEvent, notifyNewEvent, notifyNewOffer } from '@/lib/notifications';
 import { computeProfileCompletion } from './profile-completion';
 import { useEscapeKey } from '@/components/ui/useEscapeKey';
+import AICoachWidget from '@/components/AICoachWidget';
+import AICoachChat from '@/components/AICoachChat';
 import type { Nomination } from '@/app/awards/nominate/page';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { logout } from '@/app/actions/auth';
 import { getProfile, getRoadmap, toggleStepCompletion } from '@/app/actions/profile';
-import AICoachChat from '@/components/AICoachChat';
 import { getScorecardHistory, updateScorecardGoals } from '@/app/actions/scorecard';
 
 type Section = 'dashboard' | 'feed' | 'events' | 'offers' | 'awards' | 'directoryProfile' | 'business' | 'owners' | 'roadmap' | 'matches' | 'coach';
@@ -63,6 +65,7 @@ const navItems: { icon: React.ElementType; label: string; section?: Section; hre
   { icon: UserCircle, label: 'Owners', section: 'owners' },
   { icon: Users, label: 'My Matches', section: 'matches' },
   { icon: BookOpen, label: 'Resources', href: '/resources' },
+  { icon: Briefcase, label: 'Opportunities', href: '/opportunities' },
   { icon: Star, label: 'Supper Club', href: '/supper-club' },
 ];
 
@@ -73,6 +76,7 @@ type Submission = {
   submittedAt: string;
   updatedAt?: string;
   status: 'pending' | 'approved' | 'rejected' | 'archived';
+  eventDate?: string;
 };
 
 type MyOffer = {
@@ -85,7 +89,7 @@ type MyOffer = {
   expiryDate?: string;
   submittedAt: string;
   updatedAt?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'archived' | 'expired';
 };
 
 const offerTemplateLabels: Record<string, string> = {
@@ -98,14 +102,12 @@ const offerTemplateLabels: Record<string, string> = {
   affiliate: 'Affiliate Offer',
 };
 
-
-
-
-const statusStyles: Record<'pending' | 'approved' | 'rejected' | 'archived', { bg: string; color: string; label: string }> = {
+const statusStyles: Record<string, { bg: string; color: string; label: string }> = {
   pending: { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending Review' },
   approved: { bg: 'rgba(39,174,96,0.1)', color: '#27ae60', label: 'Approved' },
   rejected: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Rejected' },
   archived: { bg: 'rgba(90,86,80,0.1)', color: '#5a5650', label: 'Archived' },
+  expired: { bg: 'rgba(192,57,43,0.1)', color: '#c0392b', label: 'Expired' },
 };
 
 function formatOfferTemplate(template?: string) {
@@ -181,6 +183,22 @@ function BusinessSection({ memberBusiness, userEmail }: { memberBusiness: string
         setMyProfile(p);
         setForm({ name: p.name, industry: p.industry, location: p.location, description: p.description, website: p.website || '', lookingFor: p.lookingFor || '', tags: p.tags.join(', ') });
         setEditMode(false);
+        // Sync local business profile to DB if needed
+        if (p.name) {
+          fetch('/api/directory/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: p.name,
+              industry: p.industry,
+              location: p.location,
+              description: p.description,
+              website: p.website,
+              lookingFor: p.lookingFor,
+              tags: p.tags,
+            }),
+          }).catch(() => {});
+        }
       } catch { }
     } else {
       setMyProfile(null);
@@ -191,7 +209,7 @@ function BusinessSection({ memberBusiness, userEmail }: { memberBusiness: string
     if (allRaw) { try { setAllProfiles(JSON.parse(allRaw)); } catch { } }
   }, [memberBusiness, myBizKey]);
 
-  function saveProfile() {
+  async function saveProfile() {
     if (!form.name.trim() || !form.description.trim()) return;
     const profile: BusinessProfile = {
       id: myProfile?.id || `biz_${userKey}_${Date.now()}`,
@@ -207,6 +225,24 @@ function BusinessSection({ memberBusiness, userEmail }: { memberBusiness: string
     const updated = idx >= 0 ? existing.map(p => p.id === profile.id ? profile : p) : [...existing, profile];
     localStorage.setItem('fe_biz_profiles', JSON.stringify(updated));
     setMyProfile(profile); setAllProfiles(updated); setEditMode(false);
+
+    try {
+      await fetch('/api/directory/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          industry: form.industry,
+          location: form.location,
+          description: form.description,
+          website: form.website,
+          lookingFor: form.lookingFor,
+          tags: form.tags,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync business profile to database:", err);
+    }
   }
 
   const otherProfiles = myProfile ? allProfiles.filter(p => p.id !== myProfile.id) : allProfiles;
@@ -758,8 +794,10 @@ export default function DashboardPage() {
   const [nomPage, setNomPage] = useState(1);
   const [nomTotalPages, setNomTotalPages] = useState(1);
   const itemPerPage = 3;
+  const [recentOpportunities, setRecentOpportunities] = useState<any[]>([]);
   const [latestScorecard, setLatestScorecard] = useState<any>(null);
   const [previousScorecard, setPreviousScorecard] = useState<any>(null);
+  const [scorecardBannerDismissed, setScorecardBannerDismissed] = useState(false);
   const DEFAULT_WIDGET_GOALS = { connections: 3, events: 2, directory: 1, opportunities: 2, awards: 1, accountability: 1, revenue: '', custom: '' };
   const [widgetGoals, setWidgetGoals] = useState<Record<string, any>>(DEFAULT_WIDGET_GOALS);
   const [savingWidgetGoals, setSavingWidgetGoals] = useState(false);
@@ -780,7 +818,7 @@ export default function DashboardPage() {
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load scorecard history for widget:', err);
     }
   };
 
@@ -989,8 +1027,9 @@ export default function DashboardPage() {
         const res = await fetch('/api/events?mySubmissions=true');
 
         if (res.ok) {
-          const allEvents = await res.json();
-          const mine = allEvents.filter((e: any) => e.member_id === memberId);
+          const rawEvents = await res.json();
+          const eventsList = Array.isArray(rawEvents) ? rawEvents : (rawEvents.events || []);
+          const mine = eventsList.filter((e: any) => e.member_id === memberId || e.memberId === memberId);
 
           const mapped: Submission[] = mine.map((e: any) => ({
             id: e.id,
@@ -998,9 +1037,22 @@ export default function DashboardPage() {
             category: e.category,
             submittedAt: e.created_At || e.created_at || new Date().toISOString(),
             status: e.status?.toLowerCase() || 'pending',
+            eventDate: e.date || '',
           }));
 
           setMySubmissions(mapped);
+
+          // Trigger reminder notification for past events
+          const todayStart = new Date().setHours(0, 0, 0, 0);
+          mine.forEach((e: any) => {
+            if (e.date) {
+              const dateStr = e.date.includes('-') || e.date.includes('20') ? e.date : `${e.date} 2026`;
+              const eventTime = new Date(dateStr).getTime();
+              if (!isNaN(eventTime) && eventTime < todayStart) {
+                notifyEndedEvent(e.title);
+              }
+            }
+          });
         }
       } catch (err) {
         console.error('Failed to load submissions from API:', err);
@@ -1024,11 +1076,55 @@ export default function DashboardPage() {
             status: o.status.toLowerCase() as any,
           }));
           setMyOffers(mapped);
+
+          // Trigger reminder notification for expired offers
+          dbData.forEach((o: any) => {
+            if (o.expiry_date && new Date(o.expiry_date).getTime() <= Date.now()) {
+              notifyExpiredOffer(o.title);
+            }
+          });
         }
       } catch (err) {
         console.error('Failed to load offers from API:', err);
       }
     };
+
+    const loadCommunityAlerts = async () => {
+      try {
+        const [eventsRes, offersRes] = await Promise.all([
+          fetch('/api/events?limit=5'),
+          fetch('/api/offers?page=1&limit=5')
+        ]);
+
+        if (eventsRes.ok) {
+          const data = await eventsRes.json();
+          const eventsList = Array.isArray(data) ? data : (data.events || []);
+          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          eventsList.forEach((e: any) => {
+            const created = new Date(e.created_at || e.createdAt || Date.now()).getTime();
+            if (created > threeDaysAgo && (e.status?.toUpperCase() === 'APPROVED' || e.status?.toLowerCase() === 'approved')) {
+              notifyNewEvent(e.title, e.host, e.id);
+            }
+          });
+        }
+
+        if (offersRes.ok) {
+          const data = await offersRes.json();
+          const offersList = Array.isArray(data) ? data : (data.offers || []);
+          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          offersList.forEach((o: any) => {
+            const created = new Date(o.created_at || o.createdAt || Date.now()).getTime();
+            if (created > threeDaysAgo && (o.status?.toLowerCase() === 'approved' || o.status?.toUpperCase() === 'APPROVED')) {
+              notifyNewOffer(o.title, o.business_name, o.id);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load community notifications:', err);
+      }
+    };
+
+    loadCommunityAlerts();
 
     const loadNominations = async () => {
       try {
@@ -1228,20 +1324,24 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {mySubmissions.map(sub => {
-                  const s = statusStyles[sub.status];
+                  const s = statusStyles[sub.status?.toLowerCase()] || statusStyles.pending;
                   const canEdit = sub.status !== 'approved';
+                  const isPast = sub.eventDate ? new Date(sub.eventDate.includes('-') || sub.eventDate.includes('20') ? sub.eventDate : `${sub.eventDate} 2026`).getTime() < new Date().setHours(0, 0, 0, 0) : false;
                   return (
                     <div key={sub.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 6 }}>{sub.title}</div>
+                        <div style={{ fontWeight: 700, fontSize: '16px', color: '#2a2820', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>{sub.title}</span>
+                          {isPast && <span style={{ fontSize: '10px', fontWeight: 700, color: '#9a9585', background: '#f0efe9', padding: '2px 8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Ended</span>}
+                        </div>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           <span className="tag" style={{ fontSize: '10px', padding: '2px 8px' }}>{sub.category}</span>
                           <span style={{ fontSize: '12px', color: '#9a9585' }}>
                             Submitted {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
-                          {sub.updatedAt && (
-                            <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                              · Updated {new Date(sub.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {sub.eventDate && (
+                            <span style={{ fontSize: '12px', color: isPast ? '#9a9585' : '#e7b605', fontWeight: 600 }}>
+                              · Event Date: {sub.eventDate}
                             </span>
                           )}
                         </div>
@@ -1250,6 +1350,14 @@ export default function DashboardPage() {
                         <span style={{ background: s.bg, color: s.color, padding: '4px 12px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                           {s.label}
                         </span>
+                        {isPast && (
+                          <Link
+                            href="/events/submit"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: '#e7b605', color: '#000', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none' }}
+                          >
+                            <Plus size={12} /> Post New Event
+                          </Link>
+                        )}
                         {canEdit && (
                           <Link
                             href={`/events/submit?edit=${sub.id}`}
@@ -1333,14 +1441,21 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {myOffers.map(offer => {
-                  const s = statusStyles[offer.status];
+                  const s = statusStyles[offer.status?.toLowerCase()] || statusStyles.pending;
                   const canEdit = offer.status !== 'approved';
                   const isExpired = offer.expiryDate && new Date(offer.expiryDate) < new Date();
                   return (
                     <div key={offer.id} style={{ padding: '20px 0', borderTop: '1px solid #f0efe9', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                          <span style={{ fontWeight: 900, fontSize: '20px', color: '#e7b605', fontFamily: 'DM Sans, sans-serif' }}>{offer.discount}</span>
+                          <span style={{
+                            fontWeight: 900,
+                            fontSize: (offer.discount || '').length > 15 ? '14px' : (offer.discount || '').length > 10 ? '16px' : '20px',
+                            color: '#e7b605',
+                            fontFamily: 'DM Sans, sans-serif',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
+                          }}>{offer.discount}</span>
                           {isExpired && <span style={{ fontSize: '10px', fontWeight: 700, color: '#c0392b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Expired</span>}
                         </div>
                         <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>{offer.title}</div>
@@ -1395,6 +1510,14 @@ export default function DashboardPage() {
                         >
                           {s.label}
                         </span>
+                        {isExpired && (
+                          <Link
+                            href="/offers/submit"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', background: '#e7b605', color: '#000', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', textDecoration: 'none' }}
+                          >
+                            <Plus size={12} /> Post New Offer
+                          </Link>
+                        )}
                         {canEdit && (
                           <Link
                             href={`/offers/submit?edit=${offer.id}`}
@@ -1640,7 +1763,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* ── Scorecard Widget (Redesigned & Simplified) ──── */}
+          {/* ── Scorecard Widget ──── */}
           {(() => {
             const daysSince = latestScorecard
               ? Math.floor((Date.now() - new Date(latestScorecard.createdAt).getTime()) / (1000 * 60 * 60 * 24))
@@ -1679,263 +1802,162 @@ export default function DashboardPage() {
 
             const activeGoalPills = latestScorecard
               ? (Object.entries(widgetGoals) as [string, any][])
-                  .filter(([k, v]) => GOAL_LABELS[k] && typeof v === 'number' && v > 0)
+                .filter(([k, v]) => GOAL_LABELS[k] && v !== '' && v !== null && v !== undefined && v !== 0 && v !== '0')
+                .map(([k, v]) => ({ key: k, label: GOAL_LABELS[k], val: v, icon: GOAL_ICONS[k] || '🎯' }))
               : [];
 
             return (
-              <div style={{
-                background: '#fff',
-                border: '1px solid #e2e0d8',
-                marginBottom: 32,
-                padding: '24px 28px',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: `4px solid ${latestScorecard ? scoreColor : '#9b7011'}`, padding: '24px 28px', marginBottom: '32px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart2 size={16} style={{ color: '#e7b605' }} />
+                    <Award size={16} style={{ color: latestScorecard ? scoreColor : '#e7b605' }} />
                     <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Entrepreneur Scorecard
                     </span>
+                    {latestScorecard && (
+                      <span style={{ fontSize: '11px', fontWeight: 700, background: `${scoreColor}15`, color: scoreColor, padding: '2px 8px', borderRadius: 10, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {scoreLabel}
+                      </span>
+                    )}
                   </div>
+
                   {latestScorecard && (
-                    <Link href="/dashboard/scorecard" style={{ fontSize: '12px', fontWeight: 700, color: '#9b7011', textDecoration: 'none' }}>
-                      View Full Breakdown →
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>
+                        {retakeReady ? 'Ready to retake' : daysSince !== null ? `Retake in ${30 - daysSince} days` : ''}
+                      </span>
+                      <Link href="/dashboard/scorecard" style={{ fontSize: '12px', fontWeight: 700, color: '#9b7011', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        Full Assessment <ArrowUpRight size={13} />
+                      </Link>
+                    </div>
                   )}
                 </div>
 
                 {latestScorecard ? (
                   <div>
-                    {/* Top Row: Score + Basic Info + Dropdown Toggle */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                        {/* Score Ring */}
-                        {(() => {
-                          const r = 30;
-                          const circ = 2 * Math.PI * r;
-                          const offset = circ - (circ * latestScorecard.score) / 100;
-                          return (
-                            <svg width="72" height="72" viewBox="0 0 72 72">
-                              <circle cx="36" cy="36" r={r} fill="none" stroke="#f0efe9" strokeWidth="6" />
-                              <circle
-                                cx="36" cy="36" r={r}
-                                fill="none"
-                                stroke={scoreColor}
-                                strokeWidth="6"
-                                strokeLinecap="round"
-                                strokeDasharray={circ}
-                                strokeDashoffset={offset}
-                                transform="rotate(-90 36 36)"
-                                style={{ transition: 'stroke-dashoffset 1s ease' }}
-                              />
-                              <text x="36" y="41" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontWeight="950" fontSize="18" fill="#2a2820">{latestScorecard.score}</text>
-                            </svg>
-                          );
-                        })()}
-
-                        {/* Title, Level, and Change Indicator */}
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                            <span style={{ fontSize: '16px', fontWeight: 850, color: '#2a2820', fontFamily: 'DM Sans, sans-serif' }}>
-                              Overall Rating: {latestScorecard.score}%
-                            </span>
-                            <span style={{
-                              fontSize: '10px',
-                              fontWeight: 800,
-                              color: scoreColor,
-                              background: `${scoreColor}15`,
-                              padding: '2px 8px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.03em',
-                            }}>
-                              {scoreLabel}
-                            </span>
+                    <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap', marginBottom: activeGoalPills.length > 0 || editingWidgetGoals ? 20 : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#fafaf9', padding: '14px 22px', border: '1px solid #e2e0d8', flexShrink: 0 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '32px', color: scoreColor, lineHeight: 1 }}>
+                            {latestScorecard.score}%
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '12px', color: '#9a9585' }}>
-                            <span>Taken {daysSince === 0 ? 'today' : daysSince === 1 ? '1 day ago' : `${daysSince} days ago`}</span>
-                            {scoreDiff !== null && (
-                              <span style={{
-                                fontWeight: 700,
-                                color: scoreDiff > 0 ? '#27ae60' : scoreDiff < 0 ? '#e74c3c' : '#9a9585',
-                              }}>
-                                ({scoreDiff > 0 ? `+${scoreDiff}% improvement` : scoreDiff < 0 ? `${scoreDiff}% decrease` : 'no change'})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Dropdown Action Button */}
-                      <button
-                        onClick={() => setShowWidgetDetails(!showWidgetDetails)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          background: '#fafaf9',
-                          border: '1px solid #e2e0d8',
-                          padding: '8px 16px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          color: '#5a5650',
-                          cursor: 'pointer',
-                          fontFamily: 'DM Sans, sans-serif',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        {showWidgetDetails ? 'Hide Detailed Breakdown' : 'Show Detailed Breakdown & Goals'}
-                        <ChevronRight
-                          size={14}
-                          style={{
-                            transform: showWidgetDetails ? 'rotate(90deg)' : 'none',
-                            transition: 'transform 0.2s',
-                          }}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Collapsible Dropdown Content: Capabilities and Goals */}
-                    {showWidgetDetails && (
-                      <div style={{
-                        marginTop: 20,
-                        borderTop: '1px solid #f0efe9',
-                        paddingTop: 20,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 24,
-                      }}>
-                        {/* Capabilities (Vertical list) */}
-                        {cats && Object.keys(cats).length > 0 && (
-                          <div style={{ maxWidth: 500 }}>
-                            <div style={{ fontSize: '11px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
-                              Core Capabilities Breakdown
-                            </div>
-                            {Object.entries(cats).map(([cat, val]) => {
-                              const barColor = val >= 70 ? '#27ae60' : val >= 40 ? '#e7b605' : '#e74c3c';
-                              return (
-                                <div key={cat} style={{ marginBottom: 10 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                    <span style={{ fontSize: '12px', color: '#5a5650', fontWeight: 600 }}>{cat}</span>
-                                    <span style={{ fontSize: '11px', fontWeight: 800, color: barColor }}>{val}%</span>
-                                  </div>
-                                  <div style={{ height: 4, background: '#f0efe9', borderRadius: 2, overflow: 'hidden' }}>
-                                    <div style={{ height: '100%', width: `${val}%`, background: barColor, borderRadius: 2 }} />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Goals (Vertical list) */}
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, maxWidth: 500 }}>
-                            <div style={{ fontSize: '11px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              My 30-Day Goals
-                            </div>
-                            {!editingWidgetGoals && (
-                              <button
-                                onClick={() => setEditingWidgetGoals(true)}
-                                style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  background: 'none', border: '1px solid #e2e0d8',
-                                  cursor: 'pointer', fontSize: '10px', fontWeight: 700,
-                                  color: '#9b7011', padding: '3px 10px',
-                                  fontFamily: 'DM Sans, sans-serif',
-                                }}
-                              >
-                                <Pencil size={10} /> Edit Goals
-                              </button>
-                            )}
-                          </div>
-
-                          {editingWidgetGoals ? (
-                            <div style={{ maxWidth: 400 }}>
-                              {([
-                                { key: 'connections',    label: 'Connections',     suffix: 'people'     },
-                                { key: 'events',         label: 'Events',          suffix: 'events'     },
-                                { key: 'directory',      label: 'Directory',       suffix: 'partners'   },
-                                { key: 'opportunities',  label: 'Opportunities',   suffix: 'from feed'  },
-                                { key: 'awards',         label: 'Nominations',     suffix: 'awards'     },
-                                { key: 'accountability', label: 'Coach Check-ins', suffix: 'sessions'   },
-                              ]).map(({ key, label, suffix }) => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-                                  <span style={{ fontSize: '12px', color: '#5a5650', fontWeight: 600, flex: 1 }}>{label}</span>
-                                  <input
-                                    type="number" min="0"
-                                    value={widgetGoals[key] ?? 0}
-                                    onChange={e => setWidgetGoals(p => ({ ...p, [key]: parseInt(e.target.value) || 0 }))}
-                                    style={{ width: 44, padding: '3px 5px', border: '1px solid #e2e0d8', textAlign: 'center', fontSize: '12px', fontWeight: 700 }}
-                                  />
-                                  <span style={{ fontSize: '11px', color: '#b8b4ae' }}>{suffix}</span>
-                                </div>
-                              ))}
-                              <input
-                                type="text" placeholder="Revenue target (e.g. $10k/mo)"
-                                value={widgetGoals.revenue ?? ''}
-                                onChange={e => setWidgetGoals(p => ({ ...p, revenue: e.target.value }))}
-                                style={{ width: '100%', padding: '6px 8px', border: '1px solid #e2e0d8', fontSize: '12px', marginBottom: 6, boxSizing: 'border-box' }}
-                              />
-                              <input
-                                type="text" placeholder="Custom goal (e.g. Launch MVP)"
-                                value={widgetGoals.custom ?? ''}
-                                onChange={e => setWidgetGoals(p => ({ ...p, custom: e.target.value }))}
-                                style={{ width: '100%', padding: '6px 8px', border: '1px solid #e2e0d8', fontSize: '12px', marginBottom: 12, boxSizing: 'border-box' }}
-                              />
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button
-                                  onClick={handleSaveWidgetGoals}
-                                  disabled={savingWidgetGoals}
-                                  className="btn-primary"
-                                  style={{ fontSize: '11px', padding: '6px 14px', border: 'none', cursor: 'pointer', flex: 1 }}
-                                >
-                                  {savingWidgetGoals ? 'Saving…' : 'Save Goals'}
-                                </button>
-                                <button
-                                  onClick={() => setEditingWidgetGoals(false)}
-                                  style={{ fontSize: '11px', padding: '6px 10px', border: '1px solid #e2e0d8', background: 'transparent', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, color: '#5a5650' }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 500 }}>
-                              {activeGoalPills.length > 0 ? (
-                                <>
-                                  {activeGoalPills.map(([key, val]) => (
-                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
-                                      <span style={{ fontSize: '15px' }}>{GOAL_ICONS[key]}</span>
-                                      <span>{GOAL_LABELS[key]}: <strong style={{ color: '#9b7011' }}>{val}</strong></span>
-                                    </div>
-                                  ))}
-                                  {widgetGoals.revenue && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
-                                      <span style={{ fontSize: '15px' }}>💰</span>
-                                      <span>Revenue Target: <strong style={{ color: '#9b7011' }}>{widgetGoals.revenue}</strong></span>
-                                    </div>
-                                  )}
-                                  {widgetGoals.custom && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13px', color: '#5a5650', fontFamily: 'DM Sans, sans-serif' }}>
-                                      <span style={{ fontSize: '15px' }}>✏️</span>
-                                      <span>Custom Goal: <em style={{ color: '#9b7011' }}>"{widgetGoals.custom}"</em></span>
-                                    </div>
-                                  )}
-                                  {widgetGoalsSaved && (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontSize: '11px', fontWeight: 700, color: '#27ae60' }}>
-                                      <CheckCircle size={12} /> Goals saved successfully
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div style={{ fontSize: '12px', color: '#9a9585', fontFamily: 'Noto Serif, serif', fontStyle: 'italic' }}>
-                                  No active goals set yet. Click <strong style={{ fontStyle: 'normal', color: '#9b7011', cursor: 'pointer' }} onClick={() => setEditingWidgetGoals(true)}>Edit Goals</strong> to set your monthly targets.
-                                </div>
-                              )}
+                          {scoreDiff !== null && (
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: scoreDiff >= 0 ? '#27ae60' : '#e74c3c', marginTop: 2 }}>
+                              {scoreDiff >= 0 ? `+${scoreDiff}%` : `${scoreDiff}%`} vs last
                             </div>
                           )}
                         </div>
+                        <div style={{ borderLeft: '1px solid #e2e0d8', paddingLeft: 14 }}>
+                          <div style={{ fontSize: '11px', color: '#9a9585', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.03em' }}>
+                            Overall Maturity Score
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#5a5650', marginTop: 2 }}>
+                            {new Date(latestScorecard.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                        </div>
                       </div>
-                    )}
+
+                      {cats && (
+                        <div style={{ flex: 1, minWidth: 260, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px 16px' }}>
+                          {Object.entries(cats).map(([catKey, val]) => {
+                            const catLabels: Record<string, string> = {
+                              finance: 'Finance & Cash Flow',
+                              market: 'Market & Sales',
+                              operations: 'Operations & Team',
+                              strategy: 'Strategy & Growth',
+                              mindset: 'Founder Mindset',
+                            };
+                            const numVal = typeof val === 'number' ? val : 0;
+                            const cColor = numVal >= 70 ? '#27ae60' : numVal >= 40 ? '#e7b605' : '#e74c3c';
+                            return (
+                              <div key={catKey}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: 2 }}>
+                                  <span style={{ color: '#5a5650', fontWeight: 600 }}>{catLabels[catKey] || catKey}</span>
+                                  <span style={{ fontWeight: 700, color: cColor }}>{numVal}%</span>
+                                </div>
+                                <div style={{ height: 4, background: '#eee', borderRadius: 2, overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${numVal}%`, background: cColor, transition: 'width 0.5s ease' }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Monthly Goals Section */}
+                    <div style={{ borderTop: '1px solid #f0efe9', paddingTop: 16, marginTop: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Target size={14} style={{ color: '#9b7011' }} />
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#2a2820', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Monthly Target Goals
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setEditingWidgetGoals(!editingWidgetGoals)}
+                          style={{ background: 'none', border: 'none', color: '#9b7011', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}
+                        >
+                          <Pencil size={12} /> {editingWidgetGoals ? 'Cancel' : 'Edit Goals'}
+                        </button>
+                      </div>
+
+                      {editingWidgetGoals ? (
+                        <div style={{ background: '#fafaf9', padding: 16, border: '1px solid #e2e0d8', borderRadius: 4 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+                            {Object.entries(GOAL_LABELS).map(([k, label]) => (
+                              <div key={k}>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#5a5650', marginBottom: 4 }}>
+                                  {GOAL_ICONS[k]} {label}
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={widgetGoals[k] ?? ''}
+                                  onChange={e => setWidgetGoals({ ...widgetGoals, [k]: e.target.value === '' ? '' : Number(e.target.value) })}
+                                  style={{ width: '100%', padding: '6px 10px', fontSize: '12px', border: '1px solid #ccc', borderRadius: 4 }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => setEditingWidgetGoals(false)}
+                              style={{ padding: '6px 14px', fontSize: '12px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveWidgetGoals}
+                              disabled={savingWidgetGoals}
+                              className="btn-primary"
+                              style={{ padding: '6px 16px', fontSize: '12px' }}
+                            >
+                              {savingWidgetGoals ? 'Saving...' : 'Save Goals'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          {activeGoalPills.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                              {activeGoalPills.map(p => (
+                                <div key={p.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(231,182,5,0.08)', border: '1px solid rgba(231,182,5,0.3)', borderRadius: 20, fontSize: '12px', fontWeight: 600, color: '#2a2820' }}>
+                                  <span>{p.icon}</span>
+                                  <span>{p.label}:</span>
+                                  <span style={{ fontWeight: 800, color: '#9b7011' }}>{p.val}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '12px', color: '#9a9585', fontStyle: 'italic' }}>
+                              No active goals set yet. Click <strong style={{ fontStyle: 'normal', color: '#9b7011', cursor: 'pointer' }} onClick={() => setEditingWidgetGoals(true)}>Edit Goals</strong> to set your monthly targets.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   /* ── Empty / No Scorecard State ── */
@@ -1957,194 +1979,179 @@ export default function DashboardPage() {
             );
           })()}
 
-          {/* Roadmap Widget: Your Next Step This Week */}
-          {!roadmapLoading && nextWidgetStep && (
-            <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <Sparkles size={16} style={{ color: '#e7b605' }} />
-                <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Your Next Step This Week
-                </span>
+        {/* Opportunity Feed Widget */}
+        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4 }}>
+                Latest Business Opportunities
+              </h2>
+              <div style={{ fontSize: '13px', color: '#9a9585' }}>
+                Top 3 most recent opportunities matching your criteria
               </div>
-              {showStepCongratulations &&
-                completingStepId === nextWidgetStep.id ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  style={{
-                    minHeight: 160,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    padding: '24px',
-                    background: 'rgba(39,174,96,0.06)',
-                    border: '1px solid rgba(39,174,96,0.25)',
-                    borderRadius: 6,
-                  }}
-                >
-                  <CheckCircle
-                    size={38}
-                    style={{
-                      color: '#27ae60',
-                      marginBottom: 12,
-                    }}
-                  />
+            </div>
+            <Link href="/opportunities" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', fontWeight: 700, color: '#9b7011', textDecoration: 'none' }}>
+              View All Opportunities <ChevronRight size={14} />
+            </Link>
+          </div>
 
-                  <div
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 900,
-                      fontSize: '20px',
-                      color: '#2a2820',
-                      marginBottom: 6,
-                    }}
-                  >
-                    Great work!
+          {recentOpportunities.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', borderTop: '1px solid #f0efe9' }}>
+              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif' }}>
+                No active opportunities found. Check back soon!
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid #f0efe9', paddingTop: 20 }}>
+              {recentOpportunities.map((opp: any) => (
+                <div key={opp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: opp.featured ? 'rgba(231,182,5,0.04)' : '#fafaf9', border: opp.featured ? '1px solid #e7b605' : '1px solid #e2e0d8' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#9b7011', textTransform: 'uppercase', background: 'rgba(231,182,5,0.1)', padding: '2px 8px' }}>
+                        {opp.type}
+                      </span>
+                      {opp.deadline && (
+                        <span style={{ fontSize: '11px', color: '#9a9585' }}>
+                          Deadline: {opp.deadline}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820' }}>
+                      {opp.title}
+                    </div>
                   </div>
-
-                  <div
-                    style={{
-                      fontFamily: 'Noto Serif, serif',
-                      fontSize: '14px',
-                      lineHeight: 1.6,
-                      color: '#5a5650',
-                    }}
-                  >
-                    You completed this recommendation. Your next step is loading…
-                  </div>
+                  <a href={opp.source_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '12px', fontWeight: 700, color: '#9b7011', textDecoration: 'none' }}>
+                    Apply <ExternalLink size={12} />
+                  </a>
                 </div>
-              ) : (
-                <StepCard
-                  weekNumber={nextWidgetStep.weekNumber}
-                  type={nextWidgetStep.type}
-                  title={nextWidgetStep.title}
-                  description={nextWidgetStep.description}
-                  actionText={nextWidgetStep.actionText}
-                  actionHref={nextWidgetStep.actionHref}
-                  completed={completedStepIds.includes(nextWidgetStep.id)}
-                  onToggleComplete={() =>
-                    handleToggleWidgetStep(nextWidgetStep.id)
-                  }
-                  onDismiss={() =>
-                    handleDismissWidgetStep(nextWidgetStep.id)
-                  }
-                  updating={completingStepId === nextWidgetStep.id}
-                />
-              )}
+              ))}
             </div>
           )}
+        </div>
 
-          {/* Roadmap Widget: Congratulate if 100% complete */}
-              {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
-                <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <Sparkles size={16} style={{ color: '#a16207' }} />
-                      <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Roadmap Complete! 🏆
-                      </span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#713f12', fontWeight: 600 }}>
-                      You've completed all items on your current track! Ready to keep growing?
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setActiveSection('roadmap')}
-                    style={{
-                      background: '#000',
-                      border: '1px solid #000',
-                      color: '#fff',
-                      padding: '8px 16px',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      fontFamily: 'DM Sans, sans-serif',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Switch Track
-                  </button>
-                </div>
-              )}
+        {/* Roadmap Widget: Your Next Step This Week */}
+        {!roadmapLoading && nextWidgetStep && (
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', borderLeft: '4px solid #e7b605', padding: '24px 28px', marginBottom: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Sparkles size={16} style={{ color: '#e7b605' }} />
+              <span style={{ fontSize: '12px', color: '#9a9585', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Your Next Step This Week
+              </span>
+            </div>
+            <StepCard
+              weekNumber={nextWidgetStep.weekNumber}
+              type={nextWidgetStep.type}
+              title={nextWidgetStep.title}
+              description={nextWidgetStep.description}
+              actionText={nextWidgetStep.actionText}
+              actionHref={nextWidgetStep.actionHref}
+              completed={completedStepIds.includes(nextWidgetStep.id)}
+              onToggleComplete={() => handleToggleWidgetStep(nextWidgetStep.id)}
+            />
+          </div>
+        )}
 
-              <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                  <div>
-                    <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4 }}>
-                      Unified Home Dashboard
-                    </h2>
-                    <div style={{ fontSize: '13px', color: '#9a9585' }}>
-                      Recent events, offers, and community posts in one place
-                    </div>
-                  </div>
-                </div>
-
-                {combinedItems.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
-                    <Rss size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
-                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>
-                      No recent activity yet
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif' }}>
-                      Events, offers, and community posts will appear here once available.
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    {combinedItems.map(item => (
-                      <div key={`${item.type}-${item.id}`} style={{ padding: '18px 0', borderTop: '1px solid #f0efe9', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                            <span className="tag" style={{ fontSize: '10px', padding: '2px 8px', textTransform: 'uppercase' }}>
-                              {item.type}
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#9a9585' }}>
-                              {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
-                          </div>
-                          <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>
-                            {item.title?.length > 90 ? item.title.slice(0, 90) + '…' : item.title}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#9a9585' }}>{item.subtitle}</div>
-                        </div>
-
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#9b7011', textTransform: 'uppercase', flexShrink: 0 }}>
-                          {item.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        {/* Roadmap Widget: Congratulate if 100% complete */}
+        {!roadmapLoading && roadmapSteps.length > 0 && !nextWidgetStep && (
+          <div style={{ background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)', border: '1px solid #fde047', padding: '24px 28px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', borderRadius: '4px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Sparkles size={16} style={{ color: '#a16207' }} />
+                <span style={{ fontSize: '12px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Roadmap Complete! 🏆
+                </span>
               </div>
-
-              <div style={{ marginTop: 2, background: '#fff', border: '1px solid #e2e0d8', padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Quick Access</span>
-
-                <button onClick={() => setActiveSection('feed')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-                  <Rss size={13} /> Feed
-                </button>
-
-                <button onClick={() => setActiveSection('events')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-                  <Calendar size={13} /> My Events ({mySubmissions.length})
-                </button>
-
-                <button onClick={() => setActiveSection('offers')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-                  <Tag size={13} /> My Offers ({myOffers.length})
-                </button>
-
-                <button onClick={() => setActiveSection('awards')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
-                  <Trophy size={13} /> My Awards ({myNominations.length})
-                </button>
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '16px', color: '#713f12' }}>
+                You&apos;ve completed all steps in your roadmap. Fantastic work!
               </div>
             </div>
-          );
+            <button
+              onClick={() => setActiveSection('roadmap')}
+              className="btn-primary"
+              style={{ fontSize: '12px', padding: '8px 16px' }}
+            >
+              View Full Roadmap
+            </button>
+          </div>
+        )}
+
+        <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '28px', marginBottom: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4 }}>
+                Unified Home Dashboard
+              </h2>
+              <div style={{ fontSize: '13px', color: '#9a9585' }}>
+                Recent events, offers, and community posts in one place
+              </div>
+            </div>
+          </div>
+
+          {combinedItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', borderTop: '1px solid #f0efe9' }}>
+              <Rss size={40} style={{ color: '#e2e0d8', marginBottom: 16 }} />
+              <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '16px', color: '#9a9585', marginBottom: 8 }}>
+                No recent activity yet
+              </div>
+              <div style={{ fontSize: '14px', color: '#b8b4ae', fontFamily: 'Noto Serif, serif' }}>
+                Events, offers, and community posts will appear here once available.
+              </div>
+            </div>
+          ) : (
+            <div>
+              {combinedItems.map(item => (
+                <div key={`${item.type}-${item.id}`} style={{ padding: '18px 0', borderTop: '1px solid #f0efe9', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                      <span className="tag" style={{ fontSize: '10px', padding: '2px 8px', textTransform: 'uppercase' }}>
+                        {item.type}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#9a9585' }}>
+                        {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#2a2820', marginBottom: 4 }}>
+                      {item.title?.length > 90 ? item.title.slice(0, 90) + '…' : item.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#9a9585' }}>{item.subtitle}</div>
+                  </div>
+
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#9b7011', textTransform: 'uppercase', flexShrink: 0 }}>
+                    {item.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 2, background: '#fff', border: '1px solid #e2e0d8', padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.06em', textTransform: 'uppercase', marginRight: 4 }}>Quick Access</span>
+
+          <button onClick={() => setActiveSection('feed')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+            <Rss size={13} /> Feed
+          </button>
+
+          <button onClick={() => setActiveSection('events')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+            <Calendar size={13} /> My Events ({mySubmissions.length})
+          </button>
+
+          <button onClick={() => setActiveSection('offers')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+            <Tag size={13} /> My Offers ({myOffers.length})
+          </button>
+
+          <button onClick={() => setActiveSection('awards')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', color: '#5a5650', cursor: 'pointer' }}>
+            <Trophy size={13} /> My Awards ({myNominations.length})
+          </button>
+        </div>
+      </div>
+    );
   }
 
           // ── Render ─────────────────────────────────────────────────────
           return (
-          <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
+            <>
+              <div style={{ display: 'flex', minHeight: '100vh', background: '#f9f9f7' }}>
 
             {/* Mobile overlay */}
             {isMobile && sidebarOpen && (
@@ -2361,5 +2368,13 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          );
-}
+          {activeSection !== 'coach' && (
+            <AICoachWidget 
+              userId={userProfile?.id} 
+              userName={userProfile?.name || member.name}
+              userAvatarUrl={userProfile?.avatarUrl || null}
+            />
+          )}
+        </>
+      );
+    }

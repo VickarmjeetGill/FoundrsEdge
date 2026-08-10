@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, X, Check, Heart, MessageCircle, CornerDownRight, Zap } from 'lucide-react';
 import type { FeedNotification } from './feed-types';
 
@@ -19,6 +20,7 @@ function relativeTime(dateStr: string): string {
 }
 
 export default function NotificationBell() {
+  const router = useRouter();
   const [notifs, setNotifs] = useState<FeedNotification[]>([]);
   const [open, setOpen]     = useState(false);
   const ref                 = useRef<HTMLDivElement>(null);
@@ -112,8 +114,33 @@ export default function NotificationBell() {
             ) : (
               notifs.slice(0, 30).map((n, i) => {
                 const cfg = typeConfig[n.type] ?? typeConfig.system;
+                const hasLink = !!n.targetUrl;
                 return (
-                  <div key={n.id} style={{ padding: '14px 20px', borderBottom: i < notifs.length - 1 ? '1px solid #f0efe9' : 'none', display: 'flex', gap: 12, alignItems: 'flex-start', background: n.read ? '#fff' : 'rgba(231,182,5,0.04)', transition: 'background 0.2s' }}>
+                  <div
+                    key={n.id}
+                    onClick={() => {
+                      if (n.targetUrl) {
+                        router.push(n.targetUrl);
+                        setOpen(false);
+                      }
+                    }}
+                    style={{
+                      padding: '14px 20px',
+                      borderBottom: i < notifs.length - 1 ? '1px solid #f0efe9' : 'none',
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'flex-start',
+                      background: n.read ? '#fff' : 'rgba(231,182,5,0.04)',
+                      transition: 'background 0.15s',
+                      cursor: hasLink ? 'pointer' : 'default',
+                    }}
+                    onMouseEnter={el => {
+                      if (hasLink) el.currentTarget.style.background = '#faf8f2';
+                    }}
+                    onMouseLeave={el => {
+                      if (hasLink) el.currentTarget.style.background = n.read ? '#fff' : 'rgba(231,182,5,0.04)';
+                    }}
+                  >
                     <div style={{ width: 28, height: 28, background: n.read ? '#f0efe9' : 'rgba(231,182,5,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {cfg.icon}
                     </div>
@@ -121,7 +148,14 @@ export default function NotificationBell() {
                       <div style={{ fontFamily: 'Noto Serif, serif', fontSize: '13px', color: '#2a2820', lineHeight: 1.5, marginBottom: 3 }}>{n.message}</div>
                       <div style={{ fontSize: '11px', color: '#9a9585', fontFamily: 'DM Sans, sans-serif', fontWeight: 600 }}>{relativeTime(n.createdAt)}</div>
                     </div>
-                    <button onClick={() => dismiss(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c8c4bc', padding: '2px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismiss(n.id);
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c8c4bc', padding: '4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+                      title="Dismiss"
+                    >
                       <X size={12} />
                     </button>
                   </div>

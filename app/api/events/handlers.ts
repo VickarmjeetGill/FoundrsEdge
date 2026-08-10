@@ -8,7 +8,9 @@ import { validateBody } from "@/lib/validate"
 import {
   sendGuestEventApprovalEmail,
   sendGuestEventRejectionEmail,
-} from "@/lib/email"
+  sendApplicationStatusEmail,
+  sendEventArchivedAlertEmail,
+} from "@/lib/email";
 import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateEventDto {
@@ -87,8 +89,16 @@ export class CreateEventDto {
   isOnline?: boolean;
 
   @IsOptional()
+  @IsString()
+  memberPromoCode?: string;
+
+  @IsOptional()
   @IsBoolean()
   agreeGuidelines?: boolean;
+
+  @IsOptional()
+  @IsString()
+  onBehalfOfMemberId?: string;
 }
 
 // Helper function to check if a string is a valid UUID
@@ -248,6 +258,8 @@ export async function getEvents(request: Request) {
           guest_name: true,
           guest_email: true,
           guest_business: true,
+          member_promo_code: true,
+          member_id: true,
           members: {
             select: {
               email: true
@@ -311,7 +323,8 @@ export async function createEvent(request: Request) {
       return NextResponse.json({ success: false, error: "Validation failed", details: errors }, { status: 400 });
     }
     const body = data;
-    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, guestName, guestEmail, guestBusiness } = body;
+    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, guestName, guestEmail, guestBusiness, onBehalfOfMemberId, memberPromoCode } = body;
+    const isOnline = body.isOnline || (location ? (location.toLowerCase().includes('online') || location.toLowerCase().includes('zoom')) : false);
 
     // Validation: Make sure they filled out all the required fields
     if (!body.title || !body.description || !body.date || !body.time || !body.location || !body.category) {
@@ -321,8 +334,10 @@ export async function createEvent(request: Request) {
       )
     }
 
+    const effectiveMemberId = (isAdmin && onBehalfOfMemberId) ? onBehalfOfMemberId : memberId;
+
     // Limit check: Check if a guest submission with this email already exists in the database
-    if (!memberId && guestEmail) {
+    if (!effectiveMemberId && guestEmail) {
       const existingEvent = await prisma.events.findFirst({
         where: {
           guest_email: {
@@ -353,8 +368,9 @@ export async function createEvent(request: Request) {
         category,
         price: price || "Free",
         host: host || "Public Submission",
-        member_id: memberId,
-        source: memberId ? "member" : "public",
+        member_id: effectiveMemberId,
+        member_promo_code: memberPromoCode || null,
+        source: isAdmin ? "admin" : (effectiveMemberId ? "member" : "public"),
         status: isAdmin ? "APPROVED" : "PENDING",
         capacity: capacity ? Number(capacity) : 50,
         featured: typeof featured === "boolean" ? featured : false,
@@ -364,13 +380,17 @@ export async function createEvent(request: Request) {
           : typeof tags === "string"
             ? tags.split(",").map((t: string) => t.trim()).filter(Boolean)
             : [],
-        guest_name: memberId ? undefined : guestName,
-        guest_email: memberId ? undefined : normalizedGuestEmail,
-        guest_business: memberId ? undefined : guestBusiness,
+        guest_name: effectiveMemberId ? undefined : guestName,
+        guest_email: effectiveMemberId ? undefined : normalizedGuestEmail,
+        guest_business: effectiveMemberId ? undefined : guestBusiness,
       }
     })
 
-    await invalidateCache();
+    try {
+      await invalidateCache();
+    } catch (cacheErr) {
+      console.warn("Cache invalidation skipped:", cacheErr);
+    }
 
     return NextResponse.json(
       { success: true, message: "Event submitted successfully", event: newEvent },
@@ -379,7 +399,7 @@ export async function createEvent(request: Request) {
   } catch (error: any) {
     console.error("API Error in POST /events:", error)
     return NextResponse.json(
-      { error: "Internal Server Error", details: error?.message || "" },
+      { error: "Internal Server Error", details: error?.message || String(error) },
       { status: 500 }
     )
   }
@@ -481,7 +501,7 @@ export async function updateEvent(
     }
 
     const body = await request.json()
-    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration } = body
+    const { title, description, date, time, location, category, price, host, tags, capacity, featured, duration, memberPromoCode } = body
 
     // Update the database record with the new edits
     const updatedEvent = await prisma.events.update({
@@ -495,6 +515,7 @@ export async function updateEvent(
         category,
         price: price !== undefined ? price : undefined,
         host: host !== undefined ? host : undefined,
+        member_promo_code: memberPromoCode !== undefined ? memberPromoCode : undefined,
         capacity: capacity !== undefined ? Number(capacity) : undefined,
         featured: typeof featured === "boolean" ? featured : undefined,
         duration: duration !== undefined ? duration : undefined,
@@ -508,7 +529,11 @@ export async function updateEvent(
       }
     })
 
-    await invalidateCache();
+    try {
+      await invalidateCache();
+    } catch (cacheErr) {
+      console.warn("Cache invalidation skipped:", cacheErr);
+    }
 
     return NextResponse.json({
       success: true,
@@ -637,12 +662,58 @@ export async function updateEventStatus(
     }
 
     // Update status to either APPROVED or REJECTED
-    const updatedEvent = await prisma.events.update({
+    let updatedEvent = await prisma.events.update({
       where: { id },
       data: {
         status: status as "APPROVED" | "REJECTED"
-      }
+      },
+      include: {
+        members: {
+          select: {
+            email: true,
+            first_name: true,
+            last_name: true,
+          },
+        },
+      },
     })
+
+    // If approved, check if event date is already in the past
+    if (status === "APPROVED" && updatedEvent.date) {
+      const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Edmonton" });
+      if (updatedEvent.date < todayStr) {
+        updatedEvent = await prisma.events.update({
+          where: { id },
+          data: {
+            status: "ARCHIVED",
+            featured: false,
+          },
+          include: {
+            members: {
+              select: {
+                email: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        });
+
+        const recipientEmail = (updatedEvent as any).members?.email || (updatedEvent as any).guest_email;
+        if (recipientEmail) {
+          const mem = (updatedEvent as any).members;
+          const name = mem
+            ? [mem.first_name, mem.last_name === 'Member' ? '' : mem.last_name].filter(Boolean).join(' ')
+            : (updatedEvent as any).guest_name || 'Event Host';
+
+          await sendEventArchivedAlertEmail({
+            to: recipientEmail,
+            name,
+            eventTitle: updatedEvent.title,
+          });
+        }
+      }
+    }
 
     console.log("Approval email debug:", {
       status,

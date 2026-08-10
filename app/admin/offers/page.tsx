@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, MapPin, Tag, Percent, Gift, Zap, Building2, Trophy, Flag, Users, Compass, Ticket, Milestone, Activity } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, MapPin, Tag, Percent, Gift, Zap, Building2, Trophy, Flag, Users, Compass, Ticket, Milestone, Activity, Plus, X, Trash2 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -12,10 +12,12 @@ import type { Offer } from '@/app/offers/page';
 type Tab = 'All' | 'Pending' | 'Approved' | 'Rejected';
 const tabs: Tab[] = ['All', 'Pending', 'Approved', 'Rejected'];
 
-const statusColors: Record<Offer['status'], { bg: string; color: string; label: string }> = {
+const statusColors: Record<string, { bg: string; color: string; label: string }> = {
   pending:  { bg: 'rgba(230,126,34,0.1)', color: '#e67e22', label: 'Pending' },
   approved: { bg: 'rgba(39,174,96,0.1)',  color: '#27ae60', label: 'Approved' },
   rejected: { bg: 'rgba(192,57,43,0.1)',  color: '#c0392b', label: 'Rejected' },
+  archived: { bg: 'rgba(90,86,80,0.1)',   color: '#5a5650', label: 'Archived' },
+  expired:  { bg: 'rgba(192,57,43,0.1)',  color: '#c0392b', label: 'Expired' },
 };
 
 const typeIcons: Record<Offer['type'], React.ReactNode> = {
@@ -45,6 +47,23 @@ export default function AdminOffersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 10;
+
+  const [membersList, setMembersList] = useState<{ id: string; name: string; email: string; businessName: string }[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [creatingOffer, setCreatingOffer] = useState(false);
+  const [deleteModalOffer, setDeleteModalOffer] = useState<{ id: string; title: string } | null>(null);
+  const [isDeletingOffer, setIsDeletingOffer] = useState(false);
+  const [newOffer, setNewOffer] = useState({
+    title: '',
+    businessName: '',
+    onBehalfOfMemberId: '',
+    category: 'Professional Services',
+    type: 'percentage',
+    discountValue: '15%',
+    description: '',
+    expiryDate: '',
+    howToRedeem: '',
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -118,7 +137,7 @@ export default function AdminOffersPage() {
             isPassport: o.is_passport || false,
             passportType: o.passport_type || 'ticket',
             promoCode: o.promo_code || '',
-            submittedBy: o.members ? `${[o.members.first_name, o.members.last_name === 'Member' ? '' : o.members.last_name].filter(Boolean).join(' ')} (${o.members.email})` : 'System / Admin'
+            submittedBy: o.members ? `${[o.members.first_name, o.members.last_name === 'Member' ? '' : o.members.last_name].filter(Boolean).join(' ')} (${o.members.email})` : 'Foundrs Edge Admin'
           }));
           setOffers(mapped);
 
@@ -138,6 +157,87 @@ export default function AdminOffersPage() {
     }
     loadAdminOffers();
   }, [authChecked, currentPage, tab, search]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    async function loadMembers() {
+      try {
+        const res = await fetch('/api/admin/users?limit=100');
+        if (res.ok) {
+          const data = await res.json();
+          const rawUsers = Array.isArray(data) ? data : (data.users || []);
+          const mapped = rawUsers
+            .filter((u: any) => u.memberProfile)
+            .map((u: any) => {
+              const mp = u.memberProfile;
+              const hasBiz = mp.businesses && mp.businesses.length > 0 && mp.businesses[0].business_name;
+              const bName = hasBiz ? mp.businesses[0].business_name : '';
+              return {
+                id: mp.id,
+                name: `${mp.first_name || ''} ${mp.last_name || ''}`.trim() || u.name || u.email,
+                email: u.email,
+                businessName: bName,
+              };
+            });
+          setMembersList(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load members for offer assignment:', err);
+      }
+    }
+    loadMembers();
+  }, [authChecked]);
+
+  async function handleCreateOffer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newOffer.title || !newOffer.businessName || !newOffer.description || !newOffer.expiryDate) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+    setCreatingOffer(true);
+    try {
+      const res = await fetch('/api/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newOffer.title,
+          businessName: newOffer.businessName,
+          category: newOffer.category,
+          type: newOffer.type,
+          discountValue: newOffer.type === 'custom' ? undefined : newOffer.discountValue,
+          customDiscount: newOffer.type === 'custom' ? newOffer.discountValue : undefined,
+          description: newOffer.description,
+          expiryDate: newOffer.expiryDate,
+          howToRedeem: newOffer.howToRedeem || 'Contact business directly for member offer redemption.',
+          onBehalfOfMemberId: newOffer.onBehalfOfMemberId || undefined,
+        }),
+      });
+      if (res.ok) {
+        showToast('Offer created successfully on behalf of member ✓');
+        setShowAddModal(false);
+        setNewOffer({
+          title: '',
+          businessName: '',
+          onBehalfOfMemberId: '',
+          category: 'Professional Services',
+          type: 'percentage',
+          discountValue: '15%',
+          description: '',
+          expiryDate: '',
+          howToRedeem: '',
+        });
+        window.location.reload();
+      } else {
+        const errData = await res.json();
+        alert(`Error creating offer: ${errData.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error occurred.');
+    } finally {
+      setCreatingOffer(false);
+    }
+  }
 
   function showToast(msg: string) {
     setToast(msg);
@@ -199,6 +299,29 @@ export default function AdminOffersPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handleConfirmDeleteOffer() {
+    if (!deleteModalOffer) return;
+    setIsDeletingOffer(true);
+    try {
+      const res = await fetch(`/api/offers/${deleteModalOffer.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        const target = offers.find(o => o.id === deleteModalOffer.id);
+        setOffers(prev => prev.filter(o => o.id !== deleteModalOffer.id));
+        if (target) updateGlobalStats(target.status, '');
+        showToast('Offer deleted successfully ✓');
+        setDeleteModalOffer(null);
+      } else {
+        const data = await res.json();
+        alert(`Error deleting offer: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete offer.');
+    } finally {
+      setIsDeletingOffer(false);
     }
   }
 
@@ -299,15 +422,38 @@ export default function AdminOffersPage() {
               </button>
             ))}
           </div>
-          <div style={{ position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9a9585' }} />
-            <input
-              className="input-field"
-              placeholder="Search offers..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 36, margin: 0, width: 260 }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '9px 16px',
+                background: '#e7b605',
+                color: '#000',
+                border: 'none',
+                fontFamily: 'DM Sans, sans-serif',
+                fontWeight: 800,
+                fontSize: '12px',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={14} /> Add Offer For Member
+            </button>
+            <div style={{ position: 'relative' }}>
+              <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9a9585' }} />
+              <input
+                className="input-field"
+                placeholder="Search offers..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36, margin: 0, width: 220 }}
+              />
+            </div>
           </div>
         </div>
 
@@ -325,7 +471,7 @@ export default function AdminOffersPage() {
         {/* Offer rows */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {filtered.map(offer => {
-            const sc = statusColors[offer.status];
+            const sc = statusColors[(offer.status || 'pending').toLowerCase()] || statusColors.pending;
             const isExpanded = expandedId === offer.id;
             const isExpired = offer.expiryDate && new Date(offer.expiryDate) < new Date();
 
@@ -349,7 +495,14 @@ export default function AdminOffersPage() {
                     </div>
                   </div>
 
-                  <div style={{ fontWeight: 900, fontSize: '20px', color: '#e7b605', flexShrink: 0 }}>{offer.discount}</div>
+                  <div style={{
+                    fontWeight: 900,
+                    fontSize: (offer.discount || '').length > 15 ? '14px' : (offer.discount || '').length > 10 ? '16px' : '20px',
+                    color: '#e7b605',
+                    maxWidth: 180,
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}>{offer.discount}</div>
 
                   {offer.expiryDate && (
                     <div style={{ fontSize: '12px', color: isExpired ? '#c0392b' : '#9a9585', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -400,6 +553,17 @@ export default function AdminOffersPage() {
                           <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a9585', marginBottom: 8 }}>How to Redeem</div>
                           <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.7, margin: 0 }}>{offer.howToRedeem || 'No redemption instructions provided.'}</p>
                         </div>
+
+                        {offer.promoCode && (
+                          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(231,182,5,0.08)', borderLeft: '4px solid #e7b605', borderRadius: 4 }}>
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: '#9b7011', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                              Member Promo Code / Redemption Code
+                            </div>
+                            <div style={{ fontSize: '14px', fontWeight: 900, color: '#2a2820', background: '#fff', border: '1px dashed #e7b605', padding: '4px 10px', display: 'inline-block', borderRadius: 4 }}>
+                              {offer.promoCode}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div>
@@ -561,6 +725,13 @@ export default function AdminOffersPage() {
                           {passportOffers[offer.id]?.isPassport ? 'View in Passport' : 'View Live'}
                         </Link>
                       )}
+
+                      <button
+                        onClick={() => setDeleteModalOffer({ id: offer.id, title: offer.title })}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#c0392b', color: '#fff', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', letterSpacing: '0.04em', marginLeft: 'auto' }}
+                      >
+                        <Trash2 size={14} /> Delete Offer
+                      </button>
                     </div>
                   </div>
                 )}
@@ -618,10 +789,284 @@ export default function AdminOffersPage() {
         )}
       </div>
 
+      {/* Add Offer Modal */}
+      {showAddModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+        }}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e0d8',
+            borderRadius: '12px',
+            maxWidth: '650px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '32px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            position: 'relative',
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              style={{
+                position: 'absolute',
+                top: 20,
+                right: 20,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#888',
+              }}
+            >
+              <X size={22} />
+            </button>
+
+            <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', color: '#000', margin: '0 0 4px 0' }}>
+              Create Offer On Behalf of Member
+            </h3>
+            <div style={{ fontSize: '13px', color: '#888', fontFamily: 'DM Sans, sans-serif', marginBottom: 20 }}>
+              Select a member account to associate with this offer. Externally, it will display under their company profile name.
+            </div>
+
+            <form onSubmit={handleCreateOffer} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Assign To Member Account *
+                </label>
+                <select
+                  className="select-field"
+                  required
+                  value={newOffer.onBehalfOfMemberId}
+                  onChange={e => {
+                    const selId = e.target.value;
+                    const member = membersList.find(m => m.id === selId);
+                    setNewOffer(prev => ({
+                      ...prev,
+                      onBehalfOfMemberId: selId,
+                      businessName: member?.businessName || member?.name || prev.businessName,
+                    }));
+                  }}
+                  style={{ width: '100%', margin: 0 }}
+                >
+                  <option value="">Select a registered member...</option>
+                  {membersList.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}{m.businessName ? ` — ${m.businessName}` : ''} ({m.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Company Profile / Business Name *
+                </label>
+                <input
+                  className="input-field"
+                  required
+                  value={newOffer.businessName}
+                  onChange={e => setNewOffer(prev => ({ ...prev, businessName: e.target.value }))}
+                  placeholder="e.g. Acme Studio"
+                  style={{ width: '100%', margin: 0 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Offer Title *
+                </label>
+                <input
+                  className="input-field"
+                  required
+                  value={newOffer.title}
+                  onChange={e => setNewOffer(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. 20% Off First Consulting Package"
+                  style={{ width: '100%', margin: 0 }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Category
+                  </label>
+                  <select
+                    className="select-field"
+                    value={newOffer.category}
+                    onChange={e => setNewOffer(prev => ({ ...prev, category: e.target.value }))}
+                    style={{ width: '100%', margin: 0 }}
+                  >
+                    {['Professional Services', 'Marketing & Design', 'Technology', 'Finance & Legal', 'Health & Wellness', 'Events & Venues', 'Retail & Products', 'Food & Beverage', 'Golf', 'Other'].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Offer Type
+                  </label>
+                  <select
+                    className="select-field"
+                    value={newOffer.type}
+                    onChange={e => {
+                      const nextType = e.target.value;
+                      setNewOffer(prev => ({
+                        ...prev,
+                        type: nextType,
+                        discountValue:
+                          nextType === 'bogo' ? 'Buy 1 Get 1 Free' :
+                          nextType === 'custom' ? (prev.discountValue === '15%' || prev.discountValue === '15' ? '' : prev.discountValue) :
+                          nextType === 'percentage' ? (prev.discountValue.includes('%') || !prev.discountValue ? '15' : prev.discountValue) :
+                          nextType === 'fixed' ? '25' : prev.discountValue
+                      }));
+                    }}
+                    style={{ width: '100%', margin: 0 }}
+                  >
+                    <option value="percentage">Percentage Discount (%)</option>
+                    <option value="fixed">Fixed Amount Discount ($)</option>
+                    <option value="bogo">Buy 1 Get 1 Free (BOGO)</option>
+                    <option value="custom">Custom Offer (e.g. Free Consultation)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    {newOffer.type === 'percentage' ? 'Discount Percentage (%)' : newOffer.type === 'fixed' ? 'Discount Amount ($)' : 'Discount / Value Headline'}
+                  </label>
+                  <input
+                    className="input-field"
+                    value={newOffer.discountValue}
+                    onChange={e => setNewOffer(prev => ({ ...prev, discountValue: e.target.value }))}
+                    placeholder={
+                      newOffer.type === 'percentage' ? 'e.g. 20 (for 20% off)' :
+                      newOffer.type === 'fixed' ? 'e.g. 50 (for $50 off)' :
+                      newOffer.type === 'bogo' ? 'e.g. Buy 1 Get 1 Free' :
+                      'e.g. Free consultation or Free strategy session'
+                    }
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Expiry Date *
+                  </label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    required
+                    value={newOffer.expiryDate}
+                    onChange={e => setNewOffer(prev => ({ ...prev, expiryDate: e.target.value }))}
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Description *
+                </label>
+                <textarea
+                  className="input-field"
+                  required
+                  rows={3}
+                  value={newOffer.description}
+                  onChange={e => setNewOffer(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe what members get with this offer..."
+                  style={{ width: '100%', margin: 0, resize: 'vertical' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  How To Redeem (Optional)
+                </label>
+                <input
+                  className="input-field"
+                  value={newOffer.howToRedeem}
+                  onChange={e => setNewOffer(prev => ({ ...prev, howToRedeem: e.target.value }))}
+                  placeholder="e.g. Mention Founders Edge when booking via website/email"
+                  style={{ width: '100%', margin: 0 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  style={{ padding: '12px 20px', background: 'transparent', border: '1px solid #ccc', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingOffer}
+                  style={{ padding: '12px 24px', background: '#e7b605', color: '#000', border: 'none', cursor: creatingOffer ? 'not-allowed' : 'pointer', fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', textTransform: 'uppercase' }}
+                >
+                  {creatingOffer ? 'Submitting...' : 'Create & Approve Offer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div style={{ position: 'fixed', bottom: 32, right: 32, background: '#000', color: '#fff', padding: '14px 24px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', zIndex: 9999, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
           {toast}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOffer && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', width: '100%', maxWidth: 460, padding: 32, position: 'relative', boxShadow: '0 12px 36px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, background: 'rgba(192,57,43,0.1)', color: '#c0392b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', marginBottom: 16 }}>
+              <Trash2 size={22} />
+            </div>
+
+            <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '20px', margin: '0 0 8px 0', color: '#2a2820' }}>
+              Delete Offer
+            </h3>
+            <p style={{ fontSize: '14px', color: '#5a5650', lineHeight: 1.6, margin: '0 0 24px 0' }}>
+              Are you sure you want to permanently delete <strong style={{ color: '#2a2820' }}>"{deleteModalOffer.title}"</strong>? This will immediately remove the offer from all live listings.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOffer(null)}
+                disabled={isDeletingOffer}
+                style={{ padding: '11px 22px', background: '#f4f3ed', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#2a2820' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteOffer}
+                disabled={isDeletingOffer}
+                style={{ padding: '11px 22px', background: '#c0392b', color: '#fff', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', cursor: isDeletingOffer ? 'not-allowed' : 'pointer', opacity: isDeletingOffer ? 0.7 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {isDeletingOffer ? 'Deleting...' : 'Delete Offer'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </AdminLayout>

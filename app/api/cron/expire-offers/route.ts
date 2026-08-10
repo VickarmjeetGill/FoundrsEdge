@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendOfferExpirationAlertEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
 
     const offersToExpire = await (prisma as any).offers.findMany({
       where: {
-        status: "APPROVED",
+        status: {
+          in: ["APPROVED", "approved"],
+        },
         expiry_date: {
           lt: now,
         },
@@ -27,6 +30,13 @@ export async function POST(request: Request) {
         id: true,
         title: true,
         expiry_date: true,
+        members: {
+          select: {
+            email: true,
+            first_name: true,
+            last_name: true,
+          },
+        },
       },
     });
 
@@ -40,7 +50,9 @@ export async function POST(request: Request) {
 
     const result = await (prisma as any).offers.updateMany({
       where: {
-        status: "APPROVED",
+        status: {
+          in: ["APPROVED", "approved"],
+        },
         expiry_date: {
           lt: now,
         },
@@ -50,11 +62,23 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log(`[Cron Offers] Successfully expired ${result.count} offers.`);
+    // Send email notifications to offer owners
+    for (const offer of offersToExpire) {
+      if (offer.members?.email) {
+        const name = [offer.members.first_name, offer.members.last_name === 'Member' ? '' : offer.members.last_name].filter(Boolean).join(' ') || 'Member';
+        await sendOfferExpirationAlertEmail({
+          to: offer.members.email,
+          name,
+          offerTitle: offer.title,
+        });
+      }
+    }
+
+    console.log(`[Cron Offers] Successfully expired ${result.count} offers and sent email alerts.`);
 
     return NextResponse.json({
       success: true,
-      message: `Successfully expired ${result.count} offers.`,
+      message: `Successfully expired ${result.count} offers and sent notifications.`,
       expiredCount: result.count,
       expiredOffers: offersToExpire,
     });

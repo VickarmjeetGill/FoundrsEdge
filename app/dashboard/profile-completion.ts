@@ -25,10 +25,10 @@ function has(v?: string | null): boolean {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
-export function computeProfileCompletion(basics: CompletionBasics): CompletionResult {
+export function computeProfileCompletion(basics: CompletionBasics, ignoreLocalStorage = false): CompletionResult {
   let biz: any = null;
   let owner: any = null;
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && !ignoreLocalStorage) {
     const userKey = basics.email ? basics.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
     const bizKey = userKey ? `fe_my_biz_profile_${userKey}` : 'fe_my_biz_profile';
     const ownerKey = userKey ? `fe_my_owner_profile_${userKey}` : 'fe_my_owner_profile';

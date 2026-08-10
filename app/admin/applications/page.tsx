@@ -2,25 +2,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Search, CheckCircle, XCircle, ChevronDown, ChevronUp,
-  Mail, Phone, Link2, Globe, Building2, X as CloseIcon,
+  Mail, Phone, Link2, Globe, Building2, X as CloseIcon, Trash2,
+  Users, Target, Compass, Sparkles, MapPin
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useEscapeKey } from '@/components/ui/useEscapeKey';
-
-/*
- * BACKEND CONTRACT (implemented by the backend team):
- *
- *   GET  /api/admin/applications            -> { applications: Application[] }
- *   PATCH /api/admin/applications/:id        body { status, notes? } -> { success: true }
- *
- * Application shape this page consumes (snake_case from the DB is also accepted):
- *   { id, firstName, lastName, email, phone?, linkedin?, industry?,
- *     businessName?, businessDesc?, website?, revenue?, priorities?: string[],
- *     status: 'pending' | 'approved' | 'rejected', reviewNotes?, submittedAt }
- */
 
 type Status = 'pending' | 'approved' | 'rejected';
 
@@ -36,13 +25,18 @@ type Application = {
   businessDesc?: string;
   website?: string;
   revenue?: string;
+  employees?: string;
+  businessType?: string;
+  geographicFocus?: string[];
+  idealClientIndustries?: string[];
+  referralPartnerIndustries?: string[];
   priorities?: string[];
+  openToMatching?: boolean;
   status: Status;
   reviewNotes?: string;
   submittedAt?: string;
 };
 
-// Accept either camelCase or the raw Supabase snake_case shape.
 function normalize(r: any): Application {
   const biz = Array.isArray(r.businesses) ? r.businesses[0] : (r.businesses || r.business || {});
   return {
@@ -57,8 +51,14 @@ function normalize(r: any): Application {
     businessDesc: r.businessDesc ?? biz?.business_desc ?? biz?.description ?? undefined,
     website: r.website ?? biz?.website ?? undefined,
     revenue: r.revenue ?? biz?.revenue ?? undefined,
-    priorities: r.priorities ?? biz?.priorities ?? undefined,
-    status: (r.status ?? r.application_status ?? 'pending').toLowerCase() as Status,
+    employees: r.employees ?? biz?.employees ?? undefined,
+    businessType: r.businessType ?? biz?.business_type ?? undefined,
+    geographicFocus: r.geographicFocus ?? biz?.geographic_focus ?? [],
+    idealClientIndustries: r.idealClientIndustries ?? biz?.ideal_client_industries ?? [],
+    referralPartnerIndustries: r.referralPartnerIndustries ?? biz?.referral_partner_industries ?? [],
+    priorities: r.priorities ?? biz?.priorities ?? [],
+    openToMatching: r.openToMatching ?? biz?.open_to_matching ?? true,
+    status: (r.status ?? r.application_status ?? biz?.status ?? 'pending').toLowerCase() as Status,
     reviewNotes: r.reviewNotes ?? r.review_notes ?? undefined,
     submittedAt: r.submittedAt ?? r.created_at ?? undefined,
   };
@@ -111,14 +111,13 @@ export default function AdminApplicationsPage() {
     setTimeout(() => setToast(null), 2500);
   }
 
-  // Optimistically update the UI, then persist to the backend (best-effort until it exists).
   function persistStatus(id: string, status: Status, notes?: string) {
     setApps(prev => prev.map(a => a.id === id ? { ...a, status, reviewNotes: notes ?? a.reviewNotes } : a));
     fetch(`/api/admin/applications/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, notes }),
-    }).catch(() => { /* backend not connected yet — UI already reflects the change */ });
+    }).catch(() => { /* best effort */ });
   }
 
   function approve(id: string) {
@@ -132,6 +131,17 @@ export default function AdminApplicationsPage() {
     showToast('Application rejected — notes saved');
     setRejectTarget(null);
     setRejectNotes('');
+  }
+
+  async function deleteApp(id: string, name: string) {
+    if (!confirm(`Are you sure you want to delete the application from ${name}?`)) return;
+    setApps(prev => prev.filter(a => a.id !== id));
+    showToast('Application deleted');
+    try {
+      await fetch(`/api/admin/applications/${id}`, { method: 'DELETE' });
+    } catch {
+      /* best effort */
+    }
   }
 
   const stats = {
@@ -178,12 +188,12 @@ export default function AdminApplicationsPage() {
               {rejectTarget.firstName} {rejectTarget.lastName}
             </h3>
             <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6, marginBottom: 20 }}>
-              Add notes on what the applicant should fix. These will be emailed to the applicant.
+              Add notes on what the applicant should fix. These will be stored for review.
             </p>
             <textarea
               value={rejectNotes}
               onChange={e => setRejectNotes(e.target.value)}
-              placeholder="e.g. Business description is too vague — please add your target customers and what makes you unique. Add a working website."
+              placeholder="e.g. Business description is too vague — please add your target customers and what makes you unique."
               rows={5}
               autoFocus
               style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e2e0d8', padding: '12px 14px', fontFamily: 'Noto Serif, serif', fontSize: '14px', lineHeight: 1.6, resize: 'vertical', outline: 'none', marginBottom: 24 }}
@@ -203,7 +213,7 @@ export default function AdminApplicationsPage() {
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '32px', letterSpacing: '-0.02em', marginBottom: 6, color: '#111' }}>Membership Applications</h1>
-          <p style={{ color: '#9a9585', fontFamily: 'Noto Serif, serif', fontSize: '15px' }}>Review applications from the membership form. Approve, or reject with notes on what to fix.</p>
+          <p style={{ color: '#9a9585', fontFamily: 'Noto Serif, serif', fontSize: '15px' }}>Review applications from the membership form. Approve, reject, or delete test entries.</p>
         </div>
 
         {/* Stats */}
@@ -283,7 +293,7 @@ export default function AdminApplicationsPage() {
                         <CheckCircle size={13} /> Approve
                       </button>
                     )}
-                    {app.status !== 'rejected' && (
+                    {app.status === 'pending' && (
                       <button onClick={() => { setRejectTarget(app); setRejectNotes(app.reviewNotes ?? ''); }} title="Reject with notes" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', border: '1px solid #e2e0d8', background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '11px', cursor: 'pointer', color: '#c0392b' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.background = 'rgba(192,57,43,0.06)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.background = 'transparent'; }}>
@@ -295,34 +305,110 @@ export default function AdminApplicationsPage() {
 
                 {/* Expanded details */}
                 {expanded && (
-                  <div style={{ padding: '0 24px 24px 80px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ padding: '0 24px 24px 80px', display: 'flex', flexDirection: 'column', gap: 16, background: '#faf9f5' }}>
                     {app.businessDesc && (
-                      <div>
+                      <div style={{ marginTop: 12 }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>What the business does</div>
-                        <p style={{ fontFamily: 'Noto Serif, serif', color: '#2a2820', fontSize: '14px', lineHeight: 1.7 }}>{app.businessDesc}</p>
+                        <p style={{ fontFamily: 'Noto Serif, serif', color: '#2a2820', fontSize: '14px', lineHeight: 1.7, margin: 0 }}>{app.businessDesc}</p>
                       </div>
                     )}
+
+                    {/* Contact & Meta Badges */}
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {app.email && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Mail size={13} style={{ color: '#e7b605' }} /> {app.email}</span>}
+                      {app.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Phone size={13} style={{ color: '#e7b605' }} /> {app.phone}</span>}
+                      {app.linkedin && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Link2 size={13} style={{ color: '#e7b605' }} /> {app.linkedin}</span>}
+                      {app.website && <a href={app.website.startsWith('http') ? app.website : `https://${app.website}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#9b7011', fontWeight: 700, textDecoration: 'none' }}><Globe size={13} /> {app.website.replace(/^https?:\/\//, '')}</a>}
+                      {app.revenue && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Building2 size={13} style={{ color: '#e7b605' }} /> Revenue: {app.revenue}</span>}
+                      {app.employees && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Users size={13} style={{ color: '#e7b605' }} /> Employees: {app.employees}</span>}
+                      {app.businessType && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Compass size={13} style={{ color: '#e7b605' }} /> Type: {app.businessType}</span>}
+                      {app.openToMatching && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', background: 'rgba(231,182,5,0.15)', color: '#9b7011', fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          <Sparkles size={12} /> Open to Smart Matching
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Priorities */}
                     {app.priorities && app.priorities.length > 0 && (
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Priorities</div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {app.priorities.map(p => <span key={p} style={{ padding: '3px 10px', background: '#f0efe9', fontSize: '11px', color: '#5a5650', fontWeight: 600 }}>{p}</span>)}
+                          {app.priorities.map(p => <span key={p} style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e0d8', fontSize: '12px', color: '#2a2820', fontWeight: 600 }}>{p}</span>)}
                         </div>
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                      {app.email && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Mail size={13} style={{ color: '#e7b605' }} /> {app.email}</span>}
-                      {app.phone && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Phone size={13} style={{ color: '#e7b605' }} /> {app.phone}</span>}
-                      {app.linkedin && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Link2 size={13} style={{ color: '#e7b605' }} /> {app.linkedin}</span>}
-                      {app.website && <a href={app.website} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#9b7011', fontWeight: 700, textDecoration: 'none' }}><Globe size={13} /> {app.website.replace(/^https?:\/\//, '')}</a>}
-                      {app.revenue && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '13px', color: '#5a5650' }}><Building2 size={13} style={{ color: '#e7b605' }} /> {app.revenue}</span>}
-                    </div>
+
+                    {/* Ideal Client Industries */}
+                    {app.idealClientIndustries && app.idealClientIndustries.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Target size={12} /> Target Client Industries
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {app.idealClientIndustries.map(ind => <span key={ind} style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e0d8', fontSize: '12px', color: '#5a5650' }}>{ind}</span>)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Referral Partner Industries */}
+                    {app.referralPartnerIndustries && app.referralPartnerIndustries.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Users size={12} /> Target Referral Partner Industries
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {app.referralPartnerIndustries.map(ind => <span key={ind} style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e0d8', fontSize: '12px', color: '#5a5650' }}>{ind}</span>)}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Geographic Focus */}
+                    {app.geographicFocus && app.geographicFocus.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a9585', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <MapPin size={12} /> Geographic Focus
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {app.geographicFocus.map(loc => <span key={loc} style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e0d8', fontSize: '12px', color: '#5a5650' }}>{loc}</span>)}
+                        </div>
+                      </div>
+                    )}
+
                     {app.reviewNotes && (
                       <div style={{ background: 'rgba(192,57,43,0.05)', borderLeft: '3px solid #c0392b', padding: '12px 16px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#c0392b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Review notes — what to fix</div>
-                        <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6 }}>{app.reviewNotes}</p>
+                        <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6, margin: 0 }}>{app.reviewNotes}</p>
                       </div>
                     )}
+
+                    {/* Footer Actions inside details */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, borderTop: '1px solid #e2e0d8', marginTop: 8 }}>
+                      <div style={{ fontSize: '12px', color: '#9a9585' }}>
+                        Submitted {fmtDate(app.submittedAt)}
+                      </div>
+                      <button
+                        onClick={() => deleteApp(app.id, `${app.firstName} ${app.lastName}`)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '8px 14px',
+                          border: '1px solid #e2e0d8',
+                          background: '#fff',
+                          fontFamily: 'DM Sans, sans-serif',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          color: '#c0392b',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c0392b'; e.currentTarget.style.background = 'rgba(192,57,43,0.06)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e0d8'; e.currentTarget.style.background = '#fff'; }}
+                      >
+                        <Trash2 size={13} /> Delete Application
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

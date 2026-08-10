@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
+import { invalidateCache } from '@/lib/redis';
+import { sendOfferExpirationAlertEmail } from '@/lib/email';
 
 //Allows admin to approve, reject, return to pending status. 
 export async function PATCH(
@@ -32,14 +34,54 @@ export async function PATCH(
         }
 
         // Modify the status of the specific offer to the database in Prisma 
-        const updatedOffer = await prisma.offers.update({
+        let updatedOffer = await prisma.offers.update({
             where: {
                 id: offerId,
             },
             data: {
                 status: data.status,
             },
+            include: {
+                members: {
+                    select: {
+                        email: true,
+                        first_name: true,
+                        last_name: true,
+                    },
+                },
+            },
         });
+
+        // If status becomes approved, check if offer is already expired
+        if (data.status === 'approved' && updatedOffer.expiry_date) {
+            const isExpired = new Date(updatedOffer.expiry_date).getTime() < Date.now();
+            if (isExpired) {
+                updatedOffer = await prisma.offers.update({
+                    where: { id: offerId },
+                    data: { status: 'EXPIRED' },
+                    include: {
+                        members: {
+                            select: {
+                                email: true,
+                                first_name: true,
+                                last_name: true,
+                            },
+                        },
+                    },
+                });
+
+                if (updatedOffer.members?.email) {
+                    const name = [updatedOffer.members.first_name, updatedOffer.members.last_name === 'Member' ? '' : updatedOffer.members.last_name].filter(Boolean).join(' ') || 'Member';
+                    await sendOfferExpirationAlertEmail({
+                        to: updatedOffer.members.email,
+                        name,
+                        offerTitle: updatedOffer.title,
+                    });
+                }
+            }
+        }
+
+        await invalidateCache();
 
         // Return the updated offer details if successful
         return NextResponse.json({ success: true, data: updatedOffer }, { status: 200 });

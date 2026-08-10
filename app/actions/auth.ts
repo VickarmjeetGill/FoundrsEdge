@@ -90,5 +90,69 @@ export async function logout() {
     redirect('/login');
 }
 
+export async function validatePasswordStrength(password: string): Promise<string | null> {
+    if (password.length < 8) {
+        return 'Password must be at least 8 characters long.';
+    }
+    if (!/[A-Z]/.test(password)) {
+        return 'Password must contain at least one uppercase letter (A-Z).';
+    }
+    if (!/[a-z]/.test(password)) {
+        return 'Password must contain at least one lowercase letter (a-z).';
+    }
+    if (!/[0-9]/.test(password)) {
+        return 'Password must contain at least one number (0-9).';
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+        return 'Password must contain at least one special character (e.g., !@#$%^&*).';
+    }
+    return null;
+}
+
+// Server Action for approved members setting up their password for the first time
+export async function setupPassword(formData: FormData) {
+    const email = (formData.get("email") as string || '').trim().toLowerCase();
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
+
+    if (!email || !password) {
+        return { error: "Email and password are required." };
+    }
+
+    const passwordError = await validatePasswordStrength(password);
+    if (passwordError) {
+        return { error: passwordError };
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+        return { error: "Passwords do not match." };
+    }
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (!user) {
+            return { error: "No user account found for this email. Please contact support or request approval." };
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                status: 'ACTIVE',
+            },
+        });
+
+        await setSession(user.id);
+        return { success: true, role: user.role };
+    } catch (error: any) {
+        console.error("[setupPassword] Error:", error);
+        return { error: `Failed to set password: ${error?.message || "Unknown error"}` };
+    }
+}
+
 
 

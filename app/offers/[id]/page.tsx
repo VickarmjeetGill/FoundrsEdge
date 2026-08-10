@@ -1,7 +1,7 @@
 'use client';
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, Calendar, Share2, Tag, Percent, Gift, Zap, Star, ChevronRight, ExternalLink, Building2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Share2, Tag, Percent, Gift, Zap, Star, ChevronRight, ExternalLink, Building2, Copy, Check } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import type { Offer } from '../page';
 
@@ -14,7 +14,7 @@ const typeColors: Record<Offer['type'], { bg: string; color: string; icon: React
 
 function isExpired(dateStr: string) {
   if (!dateStr) return false;
-  return new Date(dateStr) < new Date();
+  return new Date(dateStr).getTime() < Date.now();
 }
 
 export default function OfferDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +22,7 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
   const [offer, setOffer] = useState<Offer | null>(null);
   const [otherOffers, setOtherOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     async function loadOfferDetail() {
@@ -46,7 +47,8 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
             submittedAt: o.created_at || o.created_At || new Date().toISOString(),
             foundersEdgeDiscount: o.fe_discount,
             eventsPageUrl: o.events_page_url,
-            howToRedeem: o.how_to_redeem
+            howToRedeem: o.how_to_redeem,
+            promoCode: o.promo_code || o.promoCode || '',
           };
           setOffer(mappedOffer);
         } else {
@@ -501,13 +503,60 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 <div style={{ padding: '28px 32px', borderBottom: '1px solid #e2e0d8' }}>
+                  {offer.promoCode && !expired && (
+                    <div style={{ marginBottom: 20, padding: '16px', background: 'rgba(231,182,5,0.08)', border: '1px dashed #e7b605', borderRadius: 6, textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: '#9b7011', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'DM Sans, sans-serif' }}>
+                        Promo / Redemption Code
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                        <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '16px', color: '#2a2820', letterSpacing: '0.05em' }}>
+                          {offer.promoCode}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== 'undefined' && offer.promoCode) {
+                              navigator.clipboard?.writeText(offer.promoCode);
+                              setCopiedCode(true);
+                              setTimeout(() => setCopiedCode(false), 2000);
+                            }
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '4px 10px',
+                            border: '1px solid #e7b605',
+                            background: copiedCode ? '#27ae60' : '#fff',
+                            color: copiedCode ? '#fff' : '#9b7011',
+                            borderRadius: 4,
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontFamily: 'DM Sans, sans-serif',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {copiedCode ? <Check size={12} /> : <Copy size={12} />}
+                          {copiedCode ? 'Copied!' : 'Copy Code'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     className="btn-primary"
                     style={{ width: '100%', justifyContent: 'center', fontSize: '14px', opacity: expired ? 0.5 : 1, cursor: expired ? 'not-allowed' : 'pointer' }}
                     disabled={expired}
                     onClick={() => {
-                      if (!expired && offer.businessId) {
+                      if (expired) return;
+                      if (offer.eventsPageUrl) {
+                        const url = offer.eventsPageUrl.startsWith('http') ? offer.eventsPageUrl : `https://${offer.eventsPageUrl}`;
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      } else if (offer.businessId) {
                         window.location.href = `/directory/${offer.businessId}`;
+                      } else {
+                        window.location.href = '/directory';
                       }
                     }}
                   >

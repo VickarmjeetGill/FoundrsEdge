@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendEventArchivedAlertEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     console.log(`[Cron Archive] Running auto-archive check. Today: ${todayStr}`);
 
     // Retrieve events about to be archived for detailed logs
-    const eventsToArchive = await prisma.events.findMany({
+    const eventsToArchive = await (prisma.events as any).findMany({
       where: {
         status: "APPROVED",
         date: {
@@ -30,6 +31,15 @@ export async function POST(request: Request) {
         id: true,
         title: true,
         date: true,
+        guest_email: true,
+        guest_name: true,
+        members: {
+          select: {
+            email: true,
+            first_name: true,
+            last_name: true,
+          },
+        },
       },
     });
 
@@ -55,11 +65,27 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log(`[Cron Archive] Successfully archived ${result.count} past events.`);
+    // Send email alerts to event hosts
+    for (const event of eventsToArchive) {
+      const recipientEmail = event.members?.email || event.guest_email;
+      if (recipientEmail) {
+        const name = event.members
+          ? [event.members.first_name, event.members.last_name === 'Member' ? '' : event.members.last_name].filter(Boolean).join(' ')
+          : event.guest_name || 'Event Host';
+
+        await sendEventArchivedAlertEmail({
+          to: recipientEmail,
+          name,
+          eventTitle: event.title,
+        });
+      }
+    }
+
+    console.log(`[Cron Archive] Successfully archived ${result.count} past events and sent email alerts.`);
 
     return NextResponse.json({
       success: true,
-      message: `Successfully archived ${result.count} past events.`,
+      message: `Successfully archived ${result.count} past events and sent notifications.`,
       archivedCount: result.count,
       archivedEvents: eventsToArchive,
     });

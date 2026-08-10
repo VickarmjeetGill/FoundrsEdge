@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, Calendar, MapPin, LogOut, ChevronDown, ChevronUp, Clock, Users, DollarSign, Mail, Tag, Trophy, Flag, Milestone, Activity } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, LayoutDashboard, ClipboardList, Calendar, MapPin, LogOut, ChevronDown, ChevronUp, Clock, Users, DollarSign, Mail, Tag, Trophy, Flag, Milestone, Activity, Plus, X, Trash2 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
 import AdminLayout from '@/components/AdminLayout';
+import { supabase } from '@/lib/supabase';
 
 type EventStatus = 'approved' | 'pending' | 'rejected' | 'archived';
 
@@ -32,6 +33,7 @@ type AdminEvent = {
   guestName?: string;
   guestEmail?: string;
   guestBusiness?: string;
+  memberPromoCode?: string;
 };
 
 type Tab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -58,6 +60,27 @@ export default function AdminEventsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const itemsPerPage = 10;
+
+  const [membersList, setMembersList] = useState<{ id: string; name: string; email: string; businessName: string }[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [deleteModalEvent, setDeleteModalEvent] = useState<{ id: string | number; title: string } | null>(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    host: '',
+    onBehalfOfMemberId: '',
+    category: 'Networking',
+    date: '',
+    time: '18:00',
+    duration: '2',
+    price: 'Free',
+    capacity: '50',
+    location: '',
+    isOnline: false,
+    description: '',
+    memberPromoCode: '',
+  });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -144,7 +167,8 @@ export default function AdminEventsPage() {
               ) : false,
               location: e.location,
               description: e.description,
-              tags: e.tags && e.tags.length > 0 ? e.tags : [e.category]
+              tags: e.tags && e.tags.length > 0 ? e.tags : [e.category],
+              memberPromoCode: e.member_promo_code || e.memberPromoCode || '',
             };
           });
           setEvents(mapped);
@@ -158,6 +182,115 @@ export default function AdminEventsPage() {
       loadEvents();
     }
   }, [authChecked, currentPage, tab, search]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    async function loadMembers() {
+      try {
+        const { data } = await supabase
+          .from('members')
+          .select(`
+            id, first_name, last_name, email,
+            businesses ( id, business_name )
+          `);
+        if (data) {
+          const formatted = data.map((mp: any) => ({
+            id: mp.id,
+            name: [mp.first_name, mp.last_name === 'Member' ? '' : mp.last_name].filter(Boolean).join(' ') || mp.email,
+            email: mp.email,
+            businessName: mp.businesses?.[0]?.business_name || ''
+          }));
+          setMembersList(formatted);
+        }
+      } catch (err) {
+        console.error('Failed to load members for event assignment:', err);
+      }
+    }
+    loadMembers();
+  }, [authChecked]);
+
+  async function handleCreateEvent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newEvent.title || !newEvent.date || !newEvent.location || !newEvent.description) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+    setCreatingEvent(true);
+    try {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newEvent.title,
+          host: newEvent.host || 'Foundrs Edge Admin',
+          category: newEvent.category,
+          date: newEvent.date,
+          time: newEvent.time,
+          duration: newEvent.duration,
+          price: newEvent.price,
+          capacity: newEvent.capacity,
+          location: newEvent.location,
+          isOnline: newEvent.isOnline,
+          description: newEvent.description,
+          onBehalfOfMemberId: newEvent.onBehalfOfMemberId || undefined,
+          memberPromoCode: newEvent.memberPromoCode || undefined,
+        }),
+      });
+      if (res.ok) {
+        showToast('Event created successfully on behalf of member ✓');
+        setShowAddModal(false);
+        setNewEvent({
+          title: '',
+          host: '',
+          onBehalfOfMemberId: '',
+          category: 'Networking',
+          date: '',
+          time: '18:00',
+          duration: '2',
+          price: 'Free',
+          capacity: '50',
+          location: '',
+          isOnline: false,
+          description: '',
+          memberPromoCode: '',
+        });
+        window.location.reload();
+      } else {
+        const errData = await res.json();
+        alert(`Error creating event: ${errData.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error occurred.');
+    } finally {
+      setCreatingEvent(false);
+    }
+  }
+
+  async function handleConfirmDeleteEvent() {
+    if (!deleteModalEvent) return;
+    setIsDeletingEvent(true);
+    try {
+      const res = await fetch(`/api/events/${deleteModalEvent.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setEvents(prev => {
+          const updated = prev.filter(e => e.id !== deleteModalEvent.id);
+          persistApproved(updated);
+          return updated;
+        });
+        showToast('Event deleted successfully ✓');
+        setDeleteModalEvent(null);
+      } else {
+        const data = await res.json();
+        alert(`Error deleting event: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete event.');
+    } finally {
+      setIsDeletingEvent(false);
+    }
+  }
 
   function showToast(msg: string) {
     setToast(msg);
@@ -276,16 +409,31 @@ export default function AdminEventsPage() {
             ))}
           </div>
 
-          {/* Search */}
-          <div style={{ position: 'relative', minWidth: 220 }}>
-            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9a9585' }} />
-            <input
-              className="input-field"
-              placeholder="Search events..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 36, margin: 0, fontSize: '14px', padding: '10px 14px 10px 36px' }}
-            />
+          {/* Right actions: Search & Create Event */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div style={{ position: 'relative', minWidth: 220 }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9a9585' }} />
+              <input
+                className="input-field"
+                placeholder="Search events..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36, margin: 0, fontSize: '14px', padding: '10px 14px 10px 36px' }}
+              />
+            </div>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 18px', background: '#e7b605', color: '#000',
+                border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 800,
+                fontSize: '13px', cursor: 'pointer', letterSpacing: '0.04em',
+                flexShrink: 0
+              }}
+            >
+              <Plus size={15} /> Create Event
+            </button>
           </div>
         </div>
 
@@ -298,7 +446,7 @@ export default function AdminEventsPage() {
           )}
 
           {filtered.map((event, i) => {
-            const s = statusColors[event.status];
+            const s = statusColors[(event.status || 'pending').toLowerCase() as keyof typeof statusColors] || statusColors.pending;
             const isExpanded = expandedId === event.id;
             return (
               <div key={event.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid #e2e0d8' : 'none', borderLeft: event.featured ? '3px solid #e7b605' : '3px solid transparent' }}>
@@ -401,6 +549,7 @@ export default function AdminEventsPage() {
                     {event.status === 'rejected' && (
                       <ActionBtn onClick={() => approve(event.id)} color="#27ae60" hoverColor="#1e8449" label="Approve" icon={<CheckCircle size={13} />} />
                     )}
+                    <ActionBtn onClick={() => setDeleteModalEvent({ id: event.id, title: event.title })} color="#c0392b" hoverColor="#a93226" label="Delete" icon={<Trash2 size={13} />} />
                   </div>
                 </div>
 
@@ -433,6 +582,27 @@ export default function AdminEventsPage() {
                       <DetailField icon={<MapPin size={13} />} label="Location" value={event.isOnline ? 'Online Event' : event.location} />
                       <DetailField icon={<Mail size={13} />} label="Contact Email" value={event.hostEmail} />
                     </div>
+
+                    {/* Member Discount / Promo Code */}
+                    {event.memberPromoCode ? (
+                      <div style={{ marginBottom: 24, padding: '14px 18px', background: 'rgba(231,182,5,0.08)', borderLeft: '4px solid #e7b605', borderRadius: 4 }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#9b7011', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                          Foundrs Edge Member Promo Code / Discount
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 900, color: '#2a2820', background: '#fff', border: '1px dashed #e7b605', padding: '6px 12px', display: 'inline-block', borderRadius: 4 }}>
+                          {event.memberPromoCode}
+                        </div>
+                      </div>
+                    ) : event.price && event.price.toLowerCase() !== 'free' ? (
+                      <div style={{ marginBottom: 24, padding: '14px 18px', background: 'rgba(231,76,60,0.08)', borderLeft: '4px solid #e74c3c', borderRadius: 4 }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#c0392b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                          Missing Member Promo Code
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#5a5650' }}>
+                          This paid event does not have a 15%+ member promo code attached.
+                        </div>
+                      </div>
+                    ) : null}
 
                     {/* Tags */}
                     <div>
@@ -512,6 +682,253 @@ export default function AdminEventsPage() {
           animation: 'fadeIn 0.2s ease',
         }}>
           {toast}
+        </div>
+      )}
+
+      {/* Create Event Modal */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', padding: 32, position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #e2e0d8', paddingBottom: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '20px', margin: 0, color: '#2a2820' }}>
+                  Create Event (On Behalf of Member)
+                </h3>
+                <p style={{ fontSize: '13px', color: '#9a9585', margin: '4px 0 0 0' }}>
+                  Create an approved event listing directly or assign it to a member account.
+                </p>
+              </div>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9a9585' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Assign To Member Account (Optional)
+                </label>
+                <select
+                  className="select-field"
+                  value={newEvent.onBehalfOfMemberId}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewEvent(prev => ({
+                      ...prev,
+                      onBehalfOfMemberId: val,
+                      host: val ? (membersList.find(m => m.id === val)?.businessName || membersList.find(m => m.id === val)?.name || prev.host) : prev.host
+                    }));
+                  }}
+                  style={{ width: '100%', margin: 0 }}
+                >
+                  <option value="">None — Posted directly as Foundrs Edge Admin</option>
+                  {membersList.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.businessName ? `— ${m.businessName}` : ''} ({m.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Event Title *
+                  </label>
+                  <input
+                    className="input-field"
+                    required
+                    value={newEvent.title}
+                    onChange={e => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g. Mastermind Dinner"
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Host / Organizer
+                  </label>
+                  <input
+                    className="input-field"
+                    value={newEvent.host}
+                    onChange={e => setNewEvent(prev => ({ ...prev, host: e.target.value }))}
+                    placeholder="e.g. Foundrs Edge Admin"
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Category *
+                  </label>
+                  <select
+                    className="select-field"
+                    value={newEvent.category}
+                    onChange={e => setNewEvent(prev => ({ ...prev, category: e.target.value }))}
+                    style={{ width: '100%', margin: 0 }}
+                  >
+                    {['Networking', 'Mastermind', 'Webinar', 'Dinner / Supper Club', 'Workshop', 'Social', 'Other'].map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Price / Ticket Cost
+                  </label>
+                  <input
+                    className="input-field"
+                    value={newEvent.price}
+                    onChange={e => setNewEvent(prev => ({ ...prev, price: e.target.value }))}
+                    placeholder="e.g. Free or $49"
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    required
+                    value={newEvent.date}
+                    onChange={e => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    className="input-field"
+                    value={newEvent.time}
+                    onChange={e => setNewEvent(prev => ({ ...prev, time: e.target.value }))}
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                    Duration (Hours)
+                  </label>
+                  <input
+                    className="input-field"
+                    value={newEvent.duration}
+                    onChange={e => setNewEvent(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="2"
+                    style={{ width: '100%', margin: 0 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Location / Online Link *
+                </label>
+                <input
+                  className="input-field"
+                  required
+                  value={newEvent.location}
+                  onChange={e => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder="e.g. 123 Main St, Calgary AB or Zoom link"
+                  style={{ width: '100%', margin: 0 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Description *
+                </label>
+                <textarea
+                  className="input-field"
+                  required
+                  rows={3}
+                  value={newEvent.description}
+                  onChange={e => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe what members will learn or experience..."
+                  style={{ width: '100%', margin: 0, resize: 'vertical' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                  Member Promo Code / Discount Code (Optional)
+                </label>
+                <input
+                  className="input-field"
+                  value={newEvent.memberPromoCode}
+                  onChange={e => setNewEvent(prev => ({ ...prev, memberPromoCode: e.target.value }))}
+                  placeholder="e.g. FOUNDRS15 for 15% off tickets"
+                  style={{ width: '100%', margin: 0 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  style={{ padding: '10px 20px', background: '#f4f3ed', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingEvent}
+                  style={{ padding: '10px 20px', background: '#e7b605', color: '#000', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', cursor: creatingEvent ? 'not-allowed' : 'pointer', opacity: creatingEvent ? 0.7 : 1 }}
+                >
+                  {creatingEvent ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalEvent && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', width: '100%', maxWidth: 460, padding: 32, position: 'relative', boxShadow: '0 12px 36px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, background: 'rgba(192,57,43,0.1)', color: '#c0392b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', marginBottom: 16 }}>
+              <Trash2 size={22} />
+            </div>
+
+            <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '20px', margin: '0 0 8px 0', color: '#2a2820' }}>
+              Delete Event
+            </h3>
+            <p style={{ fontSize: '14px', color: '#5a5650', lineHeight: 1.6, margin: '0 0 24px 0' }}>
+              Are you sure you want to permanently delete <strong style={{ color: '#2a2820' }}>"{deleteModalEvent.title}"</strong>? This will immediately remove the event from the public calendar.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteModalEvent(null)}
+                disabled={isDeletingEvent}
+                style={{ padding: '11px 22px', background: '#f4f3ed', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#2a2820' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEvent}
+                disabled={isDeletingEvent}
+                style={{ padding: '11px 22px', background: '#c0392b', color: '#fff', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', cursor: isDeletingEvent ? 'not-allowed' : 'pointer', opacity: isDeletingEvent ? 0.7 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {isDeletingEvent ? 'Deleting...' : 'Delete Event'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

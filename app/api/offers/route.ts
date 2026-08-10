@@ -113,6 +113,10 @@ export class CreateOfferDto {
     @IsOptional()
     @IsBoolean()
     agreeGuidelines?: boolean;
+
+    @IsOptional()
+    @IsString()
+    onBehalfOfMemberId?: string;
 }
 
 function getOfferTemplateLabel(offer: {
@@ -183,11 +187,9 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        if (hideExpired) {
+        if (hideExpired || (!adminView && !mySubmissions)) {
             andConditions.push({
-                expiry_date: {
-                    gt: new Date()
-                }
+                expiry_date: { gt: new Date() }
             });
         }
 
@@ -207,8 +209,8 @@ export async function GET(request: NextRequest) {
             if (!user) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
             }
-            let member = await prisma.members.findUnique({
-                where: { email: user.email },
+            let member = await prisma.members.findFirst({
+                where: { email: { equals: user.email, mode: 'insensitive' } },
             });
             if (!member) {
                 const nameParts = (user.name || 'Member').trim().split(/\s+/);
@@ -216,15 +218,20 @@ export async function GET(request: NextRequest) {
                 const lastName = nameParts.slice(1).join(' ') || '';
                 member = await prisma.members.create({
                     data: {
-                        email: user.email,
+                        email: user.email.toLowerCase(),
                         first_name: firstName,
                         last_name: lastName
                     }
                 });
             }
-            andConditions.push({ member_id: member.id });
+            andConditions.push({
+                OR: [
+                    { member_id: member.id },
+                    { businesses: { member_id: member.id } }
+                ]
+            });
         } else {
-            andConditions.push({ status: 'approved' });
+            andConditions.push({ status: { equals: 'approved', mode: 'insensitive' } });
             andConditions.push({ is_passport: false });
         }
 
@@ -364,8 +371,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        let member = await prisma.members.findUnique({
-            where: { email: user.email },
+        let member = await prisma.members.findFirst({
+            where: { email: { equals: user.email, mode: 'insensitive' } },
         });
 
         if (!member) {
@@ -380,11 +387,13 @@ export async function POST(request: Request) {
                 }
             });
         }
-        const memberId = member.id;
+        const isAdmin = user.role === 'ADMIN';
+        const onBehalfOfMemberId = (data as any).onBehalfOfMemberId;
+        const effectiveMemberId = (isAdmin && onBehalfOfMemberId) ? onBehalfOfMemberId : member.id;
 
         const existingBusiness = await prisma.businesses.findFirst({
             where: {
-                member_id: memberId,
+                member_id: effectiveMemberId,
                 business_name: data.businessName,
             },
         });
@@ -395,7 +404,7 @@ export async function POST(request: Request) {
         } else {
             const newBusiness = await prisma.businesses.create({
                 data: {
-                    member_id: memberId,
+                    member_id: effectiveMemberId,
                     business_name: data.businessName,
                 },
             });
@@ -422,9 +431,14 @@ export async function POST(request: Request) {
              rawCat.toLowerCase().includes('food') || rawCat.toLowerCase().includes('restaurant') ? 'restaurant' :
              rawCat.toLowerCase().includes('golf') ? 'golf' : 'other');
 
+        const expDate = new Date(data.expiryDate);
+        if (!isNaN(expDate.getTime())) {
+            expDate.setUTCHours(23, 59, 59, 999);
+        }
+
         const offer = await (prisma as any).offers.create({
             data: {
-                member_id: memberId,
+                member_id: effectiveMemberId,
                 business_id: chosenBusinessId,
                 business_name: data.businessName,
                 category: data.category,
@@ -435,13 +449,13 @@ export async function POST(request: Request) {
                 title: data.title,
                 description: data.description,
                 location: data.location || null,
-                expiry_date: new Date(data.expiryDate),
+                expiry_date: expDate,
                 fe_discount: data.foundersEdgeDiscount || null,
                 events_page_url: data.eventsPageUrl || null,
                 how_to_redeem: data.howToRedeem,
                 promo_code: data.promoCode || null,
                 is_affiliate: false,
-                status: 'pending',
+                status: isAdmin ? 'approved' : 'pending',
             },
         });
 

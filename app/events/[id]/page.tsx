@@ -23,6 +23,8 @@ type Event = {
   featured: boolean;
   status: 'approved' | 'pending' | 'rejected';
   tags: string[];
+  member_promo_code?: string;
+  memberPromoCode?: string;
 };
 
 const categoryColors: Record<string, string> = {
@@ -343,10 +345,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       borderRadius: 3, transition: 'width 0.4s',
                     }} />
                   </div>
-                  <div style={{ textAlign: 'right', marginTop: 6, fontSize: '11px', color: '#9a9585', fontFamily: 'DM Sans, sans-serif' }}>
-                    {fillPct}% full · Capacity {event.capacity}
-                  </div>
                 </div>
+
+                {(event.member_promo_code || event.memberPromoCode) && (
+                  <div style={{
+                    padding: '16px 32px',
+                    background: 'rgba(231,182,5,0.08)',
+                    borderBottom: '1px solid #e2e0d8',
+                    borderLeft: '4px solid #e7b605',
+                  }}>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '11px', color: '#9b7011', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
+                      Foundrs Edge Member Promo Code
+                    </div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '15px', color: '#2a2820', background: '#fff', border: '1px dashed #e7b605', padding: '6px 12px', display: 'inline-block', borderRadius: 4, letterSpacing: '0.05em' }}>
+                      {event.member_promo_code || event.memberPromoCode}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ padding: '28px 32px', borderBottom: '1px solid #e2e0d8' }}>
                   <button

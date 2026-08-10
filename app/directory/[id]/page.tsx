@@ -195,11 +195,13 @@ export default function BusinessProfilePage({ params }: BusinessProfilePageProps
                           style={{
                             fontFamily: 'DM Sans, sans-serif',
                             fontWeight: 900,
-                            fontSize: 'clamp(30px, 4vw, 44px)',
-                            lineHeight: 1,
+                            fontSize: (offer.discount || '').length > 12 ? 'clamp(18px, 3vw, 24px)' : 'clamp(28px, 4vw, 38px)',
+                            lineHeight: 1.2,
                             color: '#e7b605',
                             letterSpacing: '-0.03em',
                             marginBottom: 10,
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
                           }}
                         >
                           {offer.discount}

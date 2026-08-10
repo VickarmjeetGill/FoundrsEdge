@@ -2,9 +2,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, ArrowLeft, AlertCircle } from 'lucide-react';
+import { CheckCircle, ArrowLeft, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 import { getProfile } from '@/app/actions/profile';
+import { supabase } from '@/lib/supabase';
 
 type FormData = {
   title: string;
@@ -24,6 +25,7 @@ type FormData = {
   guestName: string;
   guestEmail: string;
   guestBusiness: string;
+  memberPromoCode: string;
 };
 
 type FormErrors = Partial<Record<keyof FormData, string>>;
@@ -46,6 +48,7 @@ const initialForm: FormData = {
   guestName: '',
   guestEmail: '',
   guestBusiness: '',
+  memberPromoCode: '',
 };
 
 const categories = ['Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'];
@@ -81,6 +84,12 @@ function validateForm(form: FormData, isLoggedIn: boolean): FormErrors {
     if (!isKnownText && !isNumericPrice) {
       errors.price = 'Please enter "Free", "Members Only", or a valid dollar amount (e.g. "$45" or "45").';
     }
+  }
+
+  // Paid events require a member discount code
+  const isPaidEvent = form.price.trim() && form.price.trim().toLowerCase() !== 'free';
+  if (isPaidEvent && !form.memberPromoCode.trim()) {
+    errors.memberPromoCode = 'Paid events require a 15%+ member discount code or member rate.';
   }
 
   // 2. Fork in the road: Validate identity fields based on auth state
@@ -122,6 +131,7 @@ function EventSubmitContent() {
   const [authChecked, setAuthChecked] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
+  const [showEventGuidelinesModal, setShowEventGuidelinesModal] = useState(false);
 
   // Verify that the user is logged in
   useEffect(() => {
@@ -134,10 +144,21 @@ function EventSubmitContent() {
           setUserEmail(loggedInUser.email || '');
           setUserName(loggedInUser.name || '');
 
+          let bizName = '';
+          if (loggedInUser.email) {
+            const { data } = await supabase
+              .from('members')
+              .select('id, first_name, last_name, businesses(business_name)')
+              .eq('email', loggedInUser.email)
+              .maybeSingle();
+
+            bizName = (data as any)?.businesses?.[0]?.business_name || '';
+          }
+
           if (!editId) {
             setForm(prev => ({
               ...prev,
-              hostName: prev.hostName || loggedInUser.name || '',
+              hostName: prev.hostName || bizName || loggedInUser.name || '',
               contactEmail: prev.contactEmail || loggedInUser.email || '',
             }));
           }
@@ -182,6 +203,7 @@ function EventSubmitContent() {
             guestName: dbEvent.guestName || '',
             guestEmail: dbEvent.guestEmail || '',
             guestBusiness: dbEvent.guestBusiness || '',
+            memberPromoCode: dbEvent.member_promo_code || dbEvent.memberPromoCode || '',
           });
           setIsEditing(true);
         } else {
@@ -290,6 +312,7 @@ function EventSubmitContent() {
             tags: form.tags,
             capacity: form.capacity,
             duration: formattedDuration,
+            memberPromoCode: form.memberPromoCode,
           }),
         });
 
@@ -325,6 +348,7 @@ function EventSubmitContent() {
           tags: form.tags,
           capacity: form.capacity,
           duration: formattedDuration,
+          memberPromoCode: form.memberPromoCode,
           guestName: userEmail ? undefined : form.guestName,
           guestEmail: userEmail ? undefined : form.guestEmail,
           guestBusiness: userEmail ? undefined : form.guestBusiness,
@@ -333,7 +357,7 @@ function EventSubmitContent() {
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.error || 'Failed to submit event.');
+        setErrorMsg(data.details ? `${data.error}: ${data.details}` : (data.error || 'Failed to submit event.'));
         return;
       }
 
@@ -471,7 +495,7 @@ function EventSubmitContent() {
             </div>
 
             {/* Category + Price */}
-            <div className="grid-form" style={{ marginBottom: 20 }}>
+            <div className="grid-form" style={{ marginBottom: 16 }}>
               <div id="field-category">
                 <label style={labelStyle}>Category <span style={{ color: '#e7b605' }}>*</span></label>
                 <select className="select-field" value={form.category} onChange={e => handleChange('category', e.target.value)} style={{ margin: 0 }}>
@@ -487,6 +511,47 @@ function EventSubmitContent() {
                   onChange={e => handleChange('price', e.target.value)}
                   style={{ margin: 0 }}
                 />
+                {/* Member Ticket Discount Policy Text Bubble */}
+                <div style={{
+                  marginTop: 10,
+                  padding: '12px 14px',
+                  background: 'rgba(231,182,5,0.08)',
+                  border: '1px solid rgba(231,182,5,0.3)',
+                  borderLeft: '3px solid #e7b605',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                }}>
+                  <div style={{ fontSize: '16px', lineHeight: 1 }}>💬</div>
+                  <div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '11px', color: '#2a2820', marginBottom: 2, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                      Community Ticket Discount Policy
+                    </div>
+                    <div style={{ fontFamily: 'Noto Serif, serif', fontSize: '12px', color: '#5a5650', lineHeight: 1.5 }}>
+                      Companies can list events in the calendar without a public offer, but <strong>MUST offer a minimum 15% discount or more</strong> for paid tickets shared with our Foundrs Edge internal community.
+                    </div>
+                  </div>
+                </div>
+
+                <div id="field-memberPromoCode" style={{ marginTop: 12 }}>
+                  <label style={labelStyle}>
+                    Member Promo Code / Discount Code{' '}
+                    {form.price.trim() && form.price.trim().toLowerCase() !== 'free' ? (
+                      <span style={{ color: '#e7b605' }}>* (Required for Paid Events)</span>
+                    ) : (
+                      <span style={{ color: '#9a9585', fontWeight: 400 }}>(Optional for Free Events)</span>
+                    )}
+                  </label>
+                  <input
+                    className="input-field"
+                    placeholder="e.g. FOUNDRS15 for 15% off"
+                    value={form.memberPromoCode}
+                    onChange={e => handleChange('memberPromoCode', e.target.value)}
+                    style={fieldStyle('memberPromoCode')}
+                  />
+                  {errors.memberPromoCode && <ErrorMsg msg={errors.memberPromoCode} />}
+                </div>
               </div>
             </div>
 
@@ -653,7 +718,23 @@ function EventSubmitContent() {
                 />
                 <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: '#5a5650', lineHeight: 1.6 }}>
                   I agree to the{' '}
-                  <Link href="/membership" style={{ color: '#9b7011', textDecoration: 'underline' }}>Founders Edge Event Guidelines</Link>.
+                  <button
+                    type="button"
+                    onClick={() => setShowEventGuidelinesModal(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: '#9b7011',
+                      fontWeight: 700,
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: 'inherit',
+                    }}
+                  >
+                    Founders Edge Event Guidelines
+                  </button>.
                   I confirm this event is relevant to Calgary's entrepreneurial community and I have authority to submit it.
                   <span style={{ color: '#e7b605' }}> *</span>
                 </span>
@@ -675,6 +756,105 @@ function EventSubmitContent() {
           </form>
         </div>
       </div>
+
+      {/* Event Guidelines Modal Overlay */}
+      {showEventGuidelinesModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+        }}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e0d8',
+            borderRadius: '12px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '32px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            position: 'relative',
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowEventGuidelinesModal(false)}
+              style={{
+                position: 'absolute',
+                top: 20,
+                right: 20,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#888',
+              }}
+            >
+              <X size={22} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 40, height: 40, background: 'rgba(231,182,5,0.12)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldCheck size={22} style={{ color: '#9b7011' }} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', color: '#000', margin: 0 }}>
+                  Founders Edge Event Guidelines
+                </h3>
+                <div style={{ fontSize: '12px', color: '#888', fontFamily: 'DM Sans, sans-serif' }}>Member Event Submission Standards</div>
+              </div>
+            </div>
+
+            <hr style={{ borderColor: '#f0efe9', marginBottom: 20 }} />
+
+            <div style={{ fontFamily: 'Noto Serif, serif', color: '#4a4640', fontSize: '14px', lineHeight: 1.85 }}>
+              <p style={{ marginBottom: 16 }}>
+                All community events listed on Founders Edge must align with our mission of connecting and empowering Calgary entrepreneurs:
+              </p>
+
+              <ol style={{ paddingLeft: 20, margin: '0 0 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <li>
+                  <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#000' }}>15% Minimum Member Discount:</strong> For paid ticketed events shared with internal community members, a minimum required discount of 15% (or equivalent free access) must be provided to Founders Edge members.
+                </li>
+                <li>
+                  <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#000' }}>Community Relevance:</strong> Events must be relevant to founders, business operators, tech leaders, or Calgary professionals.
+                </li>
+                <li>
+                  <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#000' }}>Accurate Information:</strong> Event date, time, venue address (or virtual meeting link), and host contact details must be accurate and kept up to date.
+                </li>
+                <li>
+                  <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#000' }}>Safe & Professional Conduct:</strong> Event hosts are responsible for maintaining a professional, respectful, and safe environment for all attendees.
+                </li>
+                <li>
+                  <strong style={{ fontFamily: 'DM Sans, sans-serif', color: '#000' }}>Moderation & Approval:</strong> Submissions are reviewed by the Founders Edge team within 1–2 business days before being published to the calendar.
+                </li>
+              </ol>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(prev => ({ ...prev, agreeGuidelines: true }));
+                  setShowEventGuidelinesModal(false);
+                }}
+                className="btn-primary"
+                style={{ padding: '12px 24px', fontSize: '13px' }}
+              >
+                I Understand & Agree
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }
