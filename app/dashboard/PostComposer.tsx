@@ -42,9 +42,10 @@ export default function PostComposer({ currentUserName, currentUserBusiness, onP
     try {
     const eventsRes = await fetch('/api/events?adminView=true');
 if (eventsRes.ok) {
-  const eventsData = await eventsRes.json();
+  const rawEvents = await eventsRes.json();
+  const eventsData = Array.isArray(rawEvents) ? rawEvents : (rawEvents.events || []);
 
-  const approvedEvents = (eventsData || [])
+  const approvedEvents = eventsData
     .filter((event: any) => event.status?.toLowerCase() === 'approved')
     .map((event: any) => ({
       id: event.id,
@@ -63,9 +64,10 @@ if (eventsRes.ok) {
     try {
       const offersRes = await fetch('/api/offers');
       if (offersRes.ok) {
-        const offersData = await offersRes.json();
+        const rawOffers = await offersRes.json();
+        const offersData = Array.isArray(rawOffers) ? rawOffers : (rawOffers.offers || []);
 
-        const approvedOffers = (offersData || [])
+        const approvedOffers = offersData
           .filter((offer: any) => offer.status?.toLowerCase() === 'approved')
           .map((offer: any) => ({
             id: offer.id,

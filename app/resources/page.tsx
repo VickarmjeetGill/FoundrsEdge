@@ -10,10 +10,25 @@ export default function ResourcesPage() {
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'partners' | 'resources'>('partners');
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'partners' | 'resources' | 'saved'>('partners');
   const [selectedType, setSelectedType] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPartner, setSelectedPartner] = useState('');
+
+  const refreshSaved = () => {
+    try {
+      const saved = localStorage.getItem('fe_saved_resources');
+      if (saved) {
+        const ids = JSON.parse(saved);
+        if (Array.isArray(ids)) setSavedIds(ids);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    refreshSaved();
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -72,6 +87,13 @@ export default function ResourcesPage() {
 
     return matchesSearch && matchesType && matchesCategory && matchesPartner;
   });
+
+  const savedResources = resources.filter(r => savedIds.includes(r.id) && (
+    !search ||
+    r.title.toLowerCase().includes(search.toLowerCase()) ||
+    (r.description && r.description.toLowerCase().includes(search.toLowerCase())) ||
+    (r.partner?.name && r.partner.name.toLowerCase().includes(search.toLowerCase()))
+  ));
 
   return (
     <PageLayout mainStyle={{ background: 'var(--gray-50)' }}>
@@ -133,6 +155,28 @@ export default function ResourcesPage() {
             }}
           >
             All Resources ({resources.length})
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('saved');
+              refreshSaved();
+            }}
+            style={{
+              padding: '20px 0',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'saved' ? '2px solid var(--gold)' : '2px solid transparent',
+              color: activeTab === 'saved' ? 'var(--black)' : 'var(--gray-400)',
+              fontWeight: 700,
+              fontSize: '15px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              transition: 'all 0.2s'
+            }}
+          >
+            Saved ({savedIds.length})
           </button>
         </div>
       </div>
@@ -220,6 +264,8 @@ export default function ResourcesPage() {
           <div style={{ marginBottom: 24, color: 'var(--gray-400)', fontSize: '14px', fontWeight: 600 }}>
             {activeTab === 'partners' ? (
               loading ? 'Loading partners...' : `${filteredPartners.length} partner${filteredPartners.length !== 1 ? 's' : ''} found`
+            ) : activeTab === 'saved' ? (
+              loading ? 'Loading saved items...' : `${savedResources.length} saved resource${savedResources.length !== 1 ? 's' : ''}`
             ) : (
               loading ? 'Loading resources...' : `${filteredResources.length} resource${filteredResources.length !== 1 ? 's' : ''} found`
             )}
@@ -288,6 +334,22 @@ export default function ResourcesPage() {
                     </Link>
                   );
                 })}
+              </div>
+            )
+          ) : activeTab === 'saved' ? (
+            savedResources.length === 0 ? (
+              /* Empty Saved State */
+              <div style={{ textAlign: 'center', padding: '80px 40px', background: '#fff', border: '1px solid var(--gray-200)' }}>
+                <div style={{ fontSize: '40px', marginBottom: 16 }}>🔖</div>
+                <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: '18px', marginBottom: 8, color: 'var(--gray-800)' }}>No saved resources yet</div>
+                <div style={{ color: 'var(--gray-400)', fontFamily: 'var(--font-serif)' }}>Click the bookmark icon on any resource card to pin your favorite tools & playbooks here!</div>
+              </div>
+            ) : (
+              /* Saved Resources Grid */
+              <div className="grid-3" style={{ gap: '32px' }}>
+                {savedResources.map(resource => (
+                  <ResourceCard key={resource.id} resource={resource} showPartner={true} />
+                ))}
               </div>
             )
           ) : (

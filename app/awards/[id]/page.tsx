@@ -37,7 +37,8 @@ export default function AwardDetailPage({ params }: { params: Promise<{ id: stri
         // Fetch other awards for the recommendations slider
         const listRes = await fetch('/api/awards');
         if (listRes.ok) {
-          const listData = await listRes.json();
+          const rawData = await listRes.json();
+          const listData = Array.isArray(rawData) ? rawData : (rawData.awards || []);
           const mappedList: Award[] = listData.map((a: any) => ({
             ...a,
             awardDate: a.award_date || a.awardDate || '',

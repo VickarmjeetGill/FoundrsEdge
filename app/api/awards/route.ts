@@ -38,6 +38,14 @@ export async function GET(request: Request) {
             };
         } else if (nominationsOpen === 'false') {
             where.nominationsOpen = false;
+        } else {
+            // Default public view: show active awards + recently closed awards (within a 2-day grace period)
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - 2);
+            const cutoffStr = cutoff.toLocaleDateString("sv-SE", { timeZone: "America/Edmonton" });
+            where.deadline = {
+                gte: cutoffStr,
+            };
         }
 
         const [total, awards] = await Promise.all([

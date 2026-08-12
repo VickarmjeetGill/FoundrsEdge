@@ -1063,7 +1063,8 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/offers?mySubmissions=true');
         if (res.ok) {
-          const dbData = await res.json();
+          const rawData = await res.json();
+          const dbData = Array.isArray(rawData) ? rawData : (rawData.offers || []);
           const mapped: MyOffer[] = dbData.map((o: any) => ({
             id: o.id,
             title: o.title,

@@ -83,7 +83,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         // Fetch other approved events for recommendations
         const resOthers = await fetch('/api/events');
         if (resOthers.ok) {
-          const othersData = await resOthers.json();
+          const rawOthers = await resOthers.json();
+          const othersData = Array.isArray(rawOthers) ? rawOthers : (rawOthers.events || []);
           // Filter out the current event and get up to 2 recommendations
           setOtherEvents(othersData.filter((e: any) => e.id !== id).slice(0, 2));
         }

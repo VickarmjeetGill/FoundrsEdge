@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Tag, MapPin, Calendar, Star, ChevronRight, Percent, Gift, Zap, Filter } from 'lucide-react';
+import { Search, Tag, MapPin, Calendar, Star, ChevronRight, Percent, Gift, Zap, Filter, Copy, Check } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 
 export type Offer = {
@@ -70,6 +70,7 @@ export default function OffersPage() {
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -321,6 +322,37 @@ export default function OffersPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Promo Code Copy Box */}
+                  {offer.promoCode && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: '#f9f8f3', border: '1px dashed #d1cebf', padding: '8px 12px',
+                      borderRadius: '6px', fontSize: '12px', fontFamily: 'DM Sans, sans-serif'
+                    }}>
+                      <span style={{ fontWeight: 700, color: '#2a2820', letterSpacing: '0.04em' }}>
+                        Code: <span style={{ color: '#9b7011' }}>{offer.promoCode}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(offer.promoCode!);
+                          setCopiedId(offer.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        style={{
+                          background: copiedId === offer.id ? '#27ae60' : '#e7b605',
+                          color: '#fff', border: 'none', borderRadius: '4px',
+                          padding: '4px 10px', fontSize: '11px', fontWeight: 800,
+                          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {copiedId === offer.id ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy Code</>}
+                      </button>
+                    </div>
+                  )}
 
                   {/* CTA */}
                   <div style={{ marginTop: 'auto', paddingTop: 8 }}>

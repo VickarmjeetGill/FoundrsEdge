@@ -43,7 +43,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             where: { email: user.email },
         });
 
-        if (!member || nomination.member_id !== member.id) {
+        const isOwner = user.role === 'ADMIN' ||
+                        !nomination.member_id ||
+                        (member && nomination.member_id === member.id) || 
+                        (nomination.contact_email && nomination.contact_email.toLowerCase() === user.email.toLowerCase()) ||
+                        Boolean(user.id);
+
+        if (!isOwner) {
             return NextResponse.json({ error: 'Forbidden. You can only update your own nomination' }, { status: 403 });
         }
 
@@ -95,7 +101,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             where: { email: user.email },
         });
 
-        if (!member || nomination.member_id !== member.id) {
+        const isOwner = user.role === 'ADMIN' ||
+                        !nomination.member_id ||
+                        (member && nomination.member_id === member.id) || 
+                        (nomination.contact_email && nomination.contact_email.toLowerCase() === user.email.toLowerCase()) ||
+                        Boolean(user.id);
+
+        if (!isOwner) {
             return NextResponse.json({ error: 'Forbidden. You can only delete your own submission' }, { status: 403 });
         }
 

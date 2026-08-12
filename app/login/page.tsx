@@ -107,7 +107,7 @@ function LoginForm() {
               <label htmlFor="login-password" style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888' }}>
                 Password
               </label>
-              <a href="#" style={{ fontSize: '12px', color: '#e7b605', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
+              <Link href="/forgot-password" style={{ fontSize: '12px', color: '#e7b605', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</Link>
             </div>
             <div style={{ position: 'relative' }}>
               <input

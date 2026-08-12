@@ -202,7 +202,12 @@ export default function AwardsPage() {
                       <span className="tag"><Tag size={10} style={{ marginRight: 3 }} />{award.category}</span>
                       <span className="tag"><MapPin size={10} style={{ marginRight: 3 }} />{award.region}</span>
                       {award.featured && <span className="tag gold"><Star size={10} fill="#9b7011" style={{ marginRight: 3 }} />Editor&apos;s Pick</span>}
-                      {isUrgent && <span className="tag" style={{ background: '#fee2e2', color: '#dc2626' }}><Clock size={10} style={{ marginRight: 3 }} />Deadline Soon</span>}
+                      {days !== null && days >= 0 && days <= 14 && (
+                        <span className="tag" style={{ background: days <= 3 ? '#fee2e2' : '#fef3c7', color: days <= 3 ? '#dc2626' : '#b45309', fontWeight: 800 }}>
+                          <Clock size={10} style={{ marginRight: 3 }} />
+                          {days === 0 ? 'Closing Today!' : `${days} Days Left`}
+                        </span>
+                      )}
                       {isClosed && <span className="tag" style={{ background: '#f0efe9', color: '#9a9585' }}>Closed</span>}
                     </div>
                     <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '20px', marginBottom: 4, color: '#2a2820' }}>{award.name}</h3>

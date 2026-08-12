@@ -32,11 +32,12 @@ export async function PUT(
 
     // TODO: A) Retrieve the user's email or member record
     let memberId: string | null = null
-
+    let userEmail: string | null = null
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId }
       })
+      userEmail = user?.email || null
       if (user?.email) {
         const member = await prisma.members.findUnique({
           where: { email: user.email }
@@ -45,10 +46,9 @@ export async function PUT(
       }
     }
 
-
-
-    //TODO: B) Check if the user is an ADMIN or if the event's member_id matches the logged-in member's ID, if not, return a 403 Forbidden status
-    const isAuthorized = userRole === "ADMIN" || (memberId !== null && existingEvent.member_id === memberId) // Replace this with authorization check logic.
+    const isAuthorized = userRole === "ADMIN" || 
+      (memberId !== null && existingEvent.member_id === memberId) ||
+      (userEmail !== null && existingEvent.guest_email && existingEvent.guest_email.toLowerCase() === userEmail.toLowerCase())
 
     if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden: You don't own this event" }, { status: 403 })
@@ -124,10 +124,12 @@ export async function DELETE(
     const userId = decoded?.userId
 
     let memberId: string | null = null
+    let userEmailDel: string | null = null
     if (userId) {
       const user = await prisma.user.findUnique({
         where: { id: userId }
       })
+      userEmailDel = user?.email || null
       if (user?.email) {
         const member = await prisma.members.findUnique({
           where: { email: user.email }
@@ -136,7 +138,9 @@ export async function DELETE(
       }
     }
 
-    const isAuthorized = userRole === "ADMIN" || (memberId !== null && existingEvent.member_id === memberId)
+    const isAuthorized = userRole === "ADMIN" || 
+      (memberId !== null && existingEvent.member_id === memberId) ||
+      (userEmailDel !== null && existingEvent.guest_email && existingEvent.guest_email.toLowerCase() === userEmailDel.toLowerCase())
 
     if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden, Not authorized to delete this event" }, { status: 403 })

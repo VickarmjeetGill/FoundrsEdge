@@ -116,7 +116,8 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
       try {
         const res = await fetch('/api/events?adminView=true');
         if (res.ok) {
-          const dbData = await res.json();
+          const rawData = await res.json();
+          const dbData = Array.isArray(rawData) ? rawData : (rawData.events || []);
           const mapped: EventItem[] = dbData.map((e: any) => ({
             id: e.id,
             title: e.title,
@@ -1017,7 +1018,8 @@ function AwardsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
       try {
         const res = await fetch('/api/awards');
         if (res.ok) {
-          const dbData = await res.json();
+          const rawData = await res.json();
+          const dbData = Array.isArray(rawData) ? rawData : (rawData.awards || []);
           const mapped: Award[] = dbData.map((a: any) => ({
             ...a,
             awardDate: a.award_date || a.awardDate || '',

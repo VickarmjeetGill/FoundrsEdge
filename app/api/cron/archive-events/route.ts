@@ -14,17 +14,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Grab current date in Calgary (America/Edmonton) timezone in YYYY-MM-DD string format
-    const todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Edmonton" });
+    // Calculate grace period cutoff date (2 days ago in America/Edmonton timezone)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 2);
+    const archiveCutoffStr = cutoffDate.toLocaleDateString("sv-SE", { timeZone: "America/Edmonton" });
 
-    console.log(`[Cron Archive] Running auto-archive check. Today: ${todayStr}`);
+    console.log(`[Cron Archive] Running auto-archive check. Cutoff date (2-day grace): ${archiveCutoffStr}`);
 
     // Retrieve events about to be archived for detailed logs
     const eventsToArchive = await (prisma.events as any).findMany({
       where: {
         status: "APPROVED",
         date: {
-          lt: todayStr,
+          lt: archiveCutoffStr,
         },
       },
       select: {
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
       where: {
         status: "APPROVED",
         date: {
-          lt: todayStr,
+          lt: archiveCutoffStr,
         },
       },
       data: {

@@ -57,7 +57,8 @@ export default function OfferDetailPage({ params }: { params: Promise<{ id: stri
 
         const resOthers = await fetch('/api/offers');
         if (resOthers.ok) {
-          const dbOthers = await resOthers.json();
+          const rawOthers = await resOthers.json();
+          const dbOthers = Array.isArray(rawOthers) ? rawOthers : (rawOthers.offers || []);
           const mappedOthers: Offer[] = dbOthers
             .filter((o: any) => o.id !== id)
             .slice(0, 3)

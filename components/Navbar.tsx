@@ -10,6 +10,7 @@ import { getProfile } from '@/app/actions/profile';
 // filterable by category — so Events is one primary nav link.
 const primaryNavLinks = [
   { label: 'Membership', href: '/membership' },
+  { label: 'Passport', href: '/passport' },
   { label: 'Opportunities', href: '/opportunities' },
   { label: 'Directory', href: '/directory' },
   { label: 'Resources', href: '/resources' },
