@@ -5,7 +5,7 @@ export async function GET() {
     try {
         const passportOffers = await prisma.offers.findMany({
             where: {
-                status: 'approved',
+                status: { in: ['approved', 'APPROVED'] },
                 is_passport: true,
             },
             orderBy: {

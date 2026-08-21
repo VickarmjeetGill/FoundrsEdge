@@ -1203,59 +1203,61 @@ export default function DashboardPage() {
     }, [activeSection, userProfile]);
 
     async function deleteSubmission(id: string) {
+      const prevSubmissions = mySubmissions;
+      setMySubmissions(prev => prev.filter(s => s.id !== id));
+      const raw = localStorage.getItem('fe_my_submissions');
+      if (raw) {
+        try {
+          const list = JSON.parse(raw).filter((s: any) => s.id !== id);
+          localStorage.setItem('fe_my_submissions', JSON.stringify(list));
+        } catch { }
+      }
+
       try {
-        const res = await fetch(`/api/events/${id}`, {
-          method: 'DELETE',
-        });
-        if (res.ok) {
-          const updated = mySubmissions.filter(s => s.id !== id);
-          setMySubmissions(updated);
-          const raw = localStorage.getItem('fe_my_submissions');
-          if (raw) {
-            try {
-              const list = JSON.parse(raw).filter((s: any) => s.id !== id);
-              localStorage.setItem('fe_my_submissions', JSON.stringify(list));
-            } catch { }
-          }
-        } else {
+        const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          setMySubmissions(prevSubmissions);
           const data = await res.json();
           alert(`Error deleting event: ${data.error || 'Unknown error'}`);
         }
       } catch (err) {
+        setMySubmissions(prevSubmissions);
         console.error("Failed to delete event:", err);
         alert("Failed to delete event due to network error.");
       }
     }
 
     async function deleteOffer(id: string) {
+      const prevOffers = myOffers;
+      setMyOffers(prev => prev.filter(o => o.id !== id));
+
       try {
-        const res = await fetch(`/api/offers/${id}`, {
-          method: 'DELETE',
-        });
-        if (res.ok) {
-          setMyOffers(prev => prev.filter(o => o.id !== id));
-        } else {
+        const res = await fetch(`/api/offers/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          setMyOffers(prevOffers);
           const data = await res.json();
           alert(`Error deleting offer: ${data.error || 'Unknown error'}`);
         }
       } catch (err) {
+        setMyOffers(prevOffers);
         console.error("Failed to delete offer:", err);
         alert("Failed to delete offer due to network error.");
       }
     }
 
     async function deleteNomination(id: string) {
+      const prevNominations = myNominations;
+      setMyNominations(prev => prev.filter(n => n.id !== id));
+
       try {
-        const res = await fetch(`/api/nominations/${id}`, {
-          method: 'DELETE',
-        });
-        if (res.ok) {
-          setMyNominations(prev => prev.filter(n => n.id !== id));
-        } else {
+        const res = await fetch(`/api/nominations/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          setMyNominations(prevNominations);
           const data = await res.json();
           alert(`Error deleting nomination: ${data.error || 'Unknown error'}`);
         }
       } catch (err) {
+        setMyNominations(prevNominations);
         console.error("Failed to delete nomination:", err);
         alert("Failed to delete nomination due to network error.");
       }

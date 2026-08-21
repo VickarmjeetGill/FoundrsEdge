@@ -51,7 +51,7 @@ const initialForm: FormData = {
   memberPromoCode: '',
 };
 
-const categories = ['Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'];
+const categories = ['Networking', 'Workshop', 'Panel & Speaker', 'Social', 'Other'];
 
 function validateForm(form: FormData, isLoggedIn: boolean): FormErrors {
   const errors: FormErrors = {};

@@ -73,12 +73,12 @@ export async function PATCH(
         }
       }
 
-      await sendApplicationStatusEmail({
+      sendApplicationStatusEmail({
         to: member.email,
         name: recipientName,
         status: dbStatus as 'APPROVED' | 'REJECTED',
         notes: notes || undefined,
-      });
+      }).catch(err => console.error('Background status email failed:', err));
     }
 
     return NextResponse.json({ success: true });

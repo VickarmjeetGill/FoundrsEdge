@@ -1,11 +1,59 @@
 'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Users, MapPin, Calendar, Lock, Star, ArrowRight } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 
-const events: { id: number; date: string; venue: string; location: string; theme: string; spots: number; total: number; waitlist: boolean; desc: string }[] = [];
+type SupperClubEvent = {
+  id: string | number;
+  date: string;
+  venue: string;
+  location: string;
+  theme: string;
+  spots: number;
+  total: number;
+  waitlist: boolean;
+  desc: string;
+};
 
 export default function SupperClubPage() {
+  const [events, setEvents] = useState<SupperClubEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadSupperClub() {
+      try {
+        const res = await fetch('/api/events?category=Supper Club');
+        if (res.ok) {
+          const data = await res.json();
+          const evList = Array.isArray(data) ? data : data.events || [];
+          setEvents(evList.map((e: any) => {
+            const capacity = e.capacity || 12;
+            const attendees = e.attendees || 0;
+            const spotsLeft = Math.max(0, capacity - attendees);
+            const isInviteOnly = e.price ? e.price.toLowerCase().includes('invite') : false;
+            return {
+              id: e.id,
+              date: e.date ? `${e.date}${e.time ? ` at ${e.time}` : ''}` : 'Date TBD',
+              venue: e.title,
+              location: e.location || 'Calgary, AB',
+              theme: (e.tags && e.tags[1]) || (isInviteOnly ? 'Invite Only' : 'Founders Dinner'),
+              spots: spotsLeft,
+              total: capacity,
+              waitlist: spotsLeft === 0,
+              desc: e.description || '',
+            };
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch supper club events:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSupperClub();
+  }, []);
   return (
     <PageLayout>
       {/* Hero - dark, intimate feel */}

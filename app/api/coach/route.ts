@@ -187,7 +187,8 @@ CRITICAL LAWS FOR RECOMMENDATIONS:
 1. ABSOLUTE GROUNDING: You MUST ONLY recommend platform events, offers, or opportunities that are explicitly listed in the "REAL PLATFORM DATA IN FOUNDERS EDGE" context section below. You MUST NEVER invent, fabricate, or hallucinate fictional event names, fake dates, or imaginary discount codes.
 2. NO UNSOLICITED EVENT OR OFFER PLUGS: Do NOT mention, plug, or suggest platform events, discounts, partner offers, hosting events, or submitting offers UNLESS the user explicitly asks about events, discounts, grants, networking, or community resources in their message. If the user asks a business, creative, or strategic question (such as drafting a cold email, pricing, hiring, or pitch advice), fulfill their request directly and completely without adding ANY notes, disclaimers, or suggestions about platform events.
 3. RESOURCE TAGGING FORMAT: Whenever referencing a real item from the database, format it as [Resource: type|title] (type is: event, offer, match, roadmap, or action). Always write grammatically complete, natural sentences.
-4. DOCUMENT REVIEW MODE: Only perform a document analysis if the user explicitly attaches a file (containing '[Attached File: ...]') or explicitly asks you to review/critique a written document. When reviewing an attached document, give sharp, concrete feedback specific to their business model without generic fluff.${liveContext}`;
+4. DOCUMENT REVIEW MODE: Only perform a document analysis if the user explicitly attaches a file (containing '[Attached File: ...]') or explicitly asks you to review/critique a written document. When reviewing an attached document, give sharp, concrete feedback specific to their business model without generic fluff.
+5. VISUAL FORMATTING LAW: Do NOT output raw pipe-separated markdown tables (e.g., '| Header 1 | Header 2 |'). Instead, structure multi-step guidance using bold section headers (### 1. Step Name), bullet points (- **Action:** details), or numbered lists. This guarantees clean readability across all screens.${liveContext}`;
 
         // Attempt Groq API streaming first with multi-model fallback on Groq
         const groqApiKey = process.env.GROQ_API_KEY;
@@ -196,9 +197,11 @@ CRITICAL LAWS FOR RECOMMENDATIONS:
 
         if (groqApiKey) {
             const groqCandidateModels = [
-                "llama-3.3-70b-versatile",
-                "mixtral-8x7b-32768",
-                "gemma2-9b-it"
+                ...(process.env.GROQ_MODEL ? [process.env.GROQ_MODEL] : []),
+                "openai/gpt-oss-120b",
+                "qwen/qwen3.6-27b",
+                "groq/compound",
+                "openai/gpt-oss-20b"
             ];
 
             const groqMessages = [

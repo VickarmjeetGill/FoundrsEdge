@@ -62,6 +62,8 @@ export async function PUT(
         events_page_url: data.eventsPageUrl || null,
         how_to_redeem: data.howToRedeem,
         promo_code: data.promoCode || null,
+        ...(data.isPassport !== undefined ? { is_passport: Boolean(data.isPassport) } : {}),
+        ...(data.passportType !== undefined ? { passport_type: data.passportType } : {}),
         status: user.role === 'ADMIN' ? existingOffer.status : 'pending',
       },
     });
@@ -135,42 +137,65 @@ export async function PATCH(
       );
     }
 
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
+    const updateData: any = {};
 
-    const featured =
-      body.featured === true || body.featured === 'true'
-        ? true
-        : body.featured === false || body.featured === 'false'
-          ? false
-          : null;
+    if (body.status !== undefined) {
+      if (user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      updateData.status = body.status;
+    }
 
-    if (featured === null) {
+    if (body.featured !== undefined) {
+      if (user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      updateData.featured = Boolean(body.featured);
+    }
+
+    if (body.isPassport !== undefined || body.is_passport !== undefined) {
+      updateData.is_passport = Boolean(body.isPassport ?? body.is_passport);
+    }
+
+    if (body.passportType !== undefined || body.passport_type !== undefined) {
+      updateData.passport_type = body.passportType ?? body.passport_type;
+    }
+
+    if (body.promoCode !== undefined || body.promo_code !== undefined) {
+      updateData.promo_code = body.promoCode ?? body.promo_code;
+    }
+
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
-        { error: 'featured must be true or false' },
+        { error: 'No valid update fields provided' },
         { status: 400 }
       );
     }
 
-    const updatedOffer = await (prisma as any).offers.update({
+    const updatedOffer = await prisma.offers.update({
       where: { id },
-      data: {
-        featured,
-      },
+      data: updateData,
     });
+
+    const { invalidateCache } = await import('@/lib/redis');
+    await invalidateCache();
 
     return NextResponse.json({
       success: true,
-      message: featured
-        ? 'Offer marked as featured.'
-        : 'Offer removed from featured.',
       offer: updatedOffer,
     });
   } catch (error: any) {
-    console.error('Failed to update featured offer:', error);
+    console.error('Failed to update offer:', error);
 
     return NextResponse.json(
       {
-        error: 'Failed to update featured offer',
+        error: 'Failed to update offer',
         details: error?.message || '',
       },
       { status: 500 }

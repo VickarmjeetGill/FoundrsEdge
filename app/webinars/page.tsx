@@ -1,15 +1,68 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Video, Calendar, Clock, Users, Lock, Play } from 'lucide-react';
 import PageLayout from '@/components/PageLayout';
 
-const webinars: { id: number; title: string; speaker: string; speakerRole: string; date: string; time: string; duration: string; attendees: number; category: string; upcoming: boolean; replay: boolean; desc: string }[] = [];
+type Webinar = {
+  id: string | number;
+  title: string;
+  speaker: string;
+  speakerRole: string;
+  date: string;
+  time: string;
+  duration: string;
+  attendees: number;
+  category: string;
+  upcoming: boolean;
+  replay: boolean;
+  desc: string;
+};
 
-const categories = ['All', 'Sales', 'Finance', 'Funding', 'HR & People', 'Marketing'];
+const categories = ['All', 'Sales', 'Finance', 'Funding', 'HR & People', 'Marketing', 'Technology', 'Operations', 'Legal'];
 
 export default function WebinarsPage() {
+  const [webinars, setWebinars] = useState<Webinar[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'replay'>('all');
   const [category, setCategory] = useState('All');
+
+  useEffect(() => {
+    async function loadWebinars() {
+      try {
+        const res = await fetch('/api/events?category=Webinar');
+        if (res.ok) {
+          const data = await res.json();
+          const evList = Array.isArray(data) ? data : data.events || [];
+          const now = new Date().getTime();
+          setWebinars(evList.map((e: any) => {
+            const speakerMatch = e.host ? e.host.match(/^(.*?)(?:\s*\((.*?)\))?$/) : null;
+            const eventTimestamp = e.date ? new Date(e.date).getTime() : 0;
+            const isUpcoming = eventTimestamp ? eventTimestamp >= now : true;
+            return {
+              id: e.id,
+              title: e.title,
+              speaker: speakerMatch ? speakerMatch[1] : (e.host || 'Featured Expert'),
+              speakerRole: speakerMatch && speakerMatch[2] ? speakerMatch[2] : 'Guest Speaker',
+              date: e.date || 'Date TBD',
+              time: e.time || '12:00 PM',
+              duration: e.duration || '60 min',
+              attendees: e.attendees || 0,
+              category: (e.tags && e.tags[1]) || 'General',
+              upcoming: isUpcoming,
+              replay: !isUpcoming,
+              desc: e.description || '',
+            };
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load webinars:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadWebinars();
+  }, []);
 
   const filtered = webinars.filter(w => {
     const matchFilter = filter === 'all' || (filter === 'upcoming' && w.upcoming) || (filter === 'replay' && w.replay);

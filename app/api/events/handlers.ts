@@ -196,7 +196,20 @@ export async function getEvents(request: Request) {
 
     // Category filter: e.g. "Networking" or "Workshop"
     if (category && category !== "All") {
-      andConditions.push({ category })
+      andConditions.push({ category: { contains: category, mode: "insensitive" } })
+    }
+
+    // Exclude specific categories if requested (e.g. Supper Club, Webinar)
+    const excludeCategories = searchParams.get("excludeCategories")
+    if (excludeCategories) {
+      const excludedList = excludeCategories.split(",").map(c => c.trim()).filter(Boolean);
+      for (const exc of excludedList) {
+        andConditions.push({
+          NOT: {
+            category: { contains: exc, mode: "insensitive" }
+          }
+        });
+      }
     }
 
     // Featured filter: Get only highlighted events
@@ -727,19 +740,19 @@ export async function updateEventStatus(
       (updatedEvent as any).guest_email
     ) {
       if (status === "APPROVED") {
-        await sendGuestEventApprovalEmail({
+        sendGuestEventApprovalEmail({
           to: (updatedEvent as any).guest_email,
           guestName: (updatedEvent as any).guest_name,
           eventTitle: updatedEvent.title,
-        });
+        }).catch(err => console.error('Background guest approval email failed:', err));
       }
 
       if (status === "REJECTED") {
-        await sendGuestEventRejectionEmail({
+        sendGuestEventRejectionEmail({
           to: (updatedEvent as any).guest_email,
           guestName: (updatedEvent as any).guest_name,
           eventTitle: updatedEvent.title,
-        });
+        }).catch(err => console.error('Background guest rejection email failed:', err));
       }
     }
 

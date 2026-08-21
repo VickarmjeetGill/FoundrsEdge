@@ -63,6 +63,8 @@ export default function AdminOffersPage() {
     description: '',
     expiryDate: '',
     howToRedeem: '',
+    isPassport: false,
+    passportType: 'ticket' as 'ticket' | 'membership',
   });
 
   useEffect(() => {
@@ -190,8 +192,30 @@ export default function AdminOffersPage() {
 
   async function handleCreateOffer(e: React.FormEvent) {
     e.preventDefault();
-    if (!newOffer.title || !newOffer.businessName || !newOffer.description || !newOffer.expiryDate) {
-      alert('Please fill out all required fields.');
+    if (!newOffer.onBehalfOfMemberId) {
+      const el = document.getElementById('admin-offer-member');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
+      alert('Please select a member account to assign this offer to.');
+      return;
+    }
+    if (!newOffer.businessName) {
+      const el = document.getElementById('admin-offer-business');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
+      return;
+    }
+    if (!newOffer.title) {
+      const el = document.getElementById('admin-offer-title');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
+      return;
+    }
+    if (!newOffer.description) {
+      const el = document.getElementById('admin-offer-desc');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
+      return;
+    }
+    if (!newOffer.expiryDate) {
+      const el = document.getElementById('admin-offer-expiry');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
       return;
     }
     setCreatingOffer(true);
@@ -210,6 +234,8 @@ export default function AdminOffersPage() {
           expiryDate: newOffer.expiryDate,
           howToRedeem: newOffer.howToRedeem || 'Contact business directly for member offer redemption.',
           onBehalfOfMemberId: newOffer.onBehalfOfMemberId || undefined,
+          isPassport: newOffer.isPassport,
+          passportType: newOffer.isPassport ? newOffer.passportType : undefined,
         }),
       });
       if (res.ok) {
@@ -225,6 +251,8 @@ export default function AdminOffersPage() {
           description: '',
           expiryDate: '',
           howToRedeem: '',
+          isPassport: false,
+          passportType: 'ticket',
         });
         window.location.reload();
       } else {
@@ -259,69 +287,79 @@ export default function AdminOffersPage() {
   }
 
   async function approve(id: string) {
+    const target = offers.find(o => o.id === id);
+    const prevStatus = target ? target.status : 'pending';
+    const prevOffers = offers;
+
+    setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'approved' } : o));
+    updateGlobalStats(prevStatus, 'approved');
+    showToast('Offer approved ✓');
+
     try {
-      const target = offers.find(o => o.id === id);
-      const prevStatus = target ? target.status : 'pending';
       const res = await fetch(`/api/offers/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved' })
       });
-      if (res.ok) {
-        setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'approved' } : o));
-        updateGlobalStats(prevStatus, 'approved');
-        showToast('Offer approved ✓');
-      } else {
+      if (!res.ok) {
+        setOffers(prevOffers);
         const data = await res.json();
         alert(`Error approving offer: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
+      setOffers(prevOffers);
       console.error(err);
     }
   }
 
   async function reject(id: string) {
+    const target = offers.find(o => o.id === id);
+    const prevStatus = target ? target.status : 'pending';
+    const prevOffers = offers;
+
+    setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'rejected' } : o));
+    updateGlobalStats(prevStatus, 'rejected');
+    showToast('Offer rejected.');
+
     try {
-      const target = offers.find(o => o.id === id);
-      const prevStatus = target ? target.status : 'pending';
       const res = await fetch(`/api/offers/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'rejected' })
       });
-      if (res.ok) {
-        setOffers(prev => prev.map(o => o.id === id ? { ...o, status: 'rejected' } : o));
-        updateGlobalStats(prevStatus, 'rejected');
-        showToast('Offer rejected.');
-      } else {
+      if (!res.ok) {
+        setOffers(prevOffers);
         const data = await res.json();
         alert(`Error rejecting offer: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
+      setOffers(prevOffers);
       console.error(err);
     }
   }
 
   async function handleConfirmDeleteOffer() {
     if (!deleteModalOffer) return;
-    setIsDeletingOffer(true);
+    const targetId = deleteModalOffer.id;
+    const prevOffers = offers;
+    const target = offers.find(o => o.id === targetId);
+
+    setOffers(prev => prev.filter(o => o.id !== targetId));
+    if (target) updateGlobalStats(target.status, '');
+    showToast('Offer deleted successfully ✓');
+    setDeleteModalOffer(null);
+
     try {
-      const res = await fetch(`/api/offers/${deleteModalOffer.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        const target = offers.find(o => o.id === deleteModalOffer.id);
-        setOffers(prev => prev.filter(o => o.id !== deleteModalOffer.id));
-        if (target) updateGlobalStats(target.status, '');
-        showToast('Offer deleted successfully ✓');
-        setDeleteModalOffer(null);
-      } else {
+      const res = await fetch(`/api/offers/${targetId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setOffers(prevOffers);
         const data = await res.json();
         alert(`Error deleting offer: ${data.error || 'Unknown error'}`);
       }
     } catch (err) {
+      setOffers(prevOffers);
       console.error(err);
       alert('Failed to delete offer.');
-    } finally {
-      setIsDeletingOffer(false);
     }
   }
 
@@ -718,7 +756,7 @@ export default function AdminOffersPage() {
                       )}
                       {offer.status === 'approved' && (
                         <Link
-                          href={passportOffers[offer.id]?.isPassport ? '/passport' : `/offers/${offer.id}`}
+                          href={passportOffers[offer.id]?.isPassport ? '/passport#passport-deals' : `/offers/${offer.id}`}
                           target="_blank"
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', color: '#5a5650', textDecoration: 'none', letterSpacing: '0.04em' }}
                         >
@@ -846,6 +884,7 @@ export default function AdminOffersPage() {
                   Assign To Member Account *
                 </label>
                 <select
+                  id="admin-offer-member"
                   className="select-field"
                   required
                   value={newOffer.onBehalfOfMemberId}
@@ -874,6 +913,7 @@ export default function AdminOffersPage() {
                   Company Profile / Business Name *
                 </label>
                 <input
+                  id="admin-offer-business"
                   className="input-field"
                   required
                   value={newOffer.businessName}
@@ -888,6 +928,7 @@ export default function AdminOffersPage() {
                   Offer Title *
                 </label>
                 <input
+                  id="admin-offer-title"
                   className="input-field"
                   required
                   value={newOffer.title}
@@ -967,6 +1008,7 @@ export default function AdminOffersPage() {
                     Expiry Date *
                   </label>
                   <input
+                    id="admin-offer-expiry"
                     type="date"
                     className="input-field"
                     required
@@ -982,6 +1024,7 @@ export default function AdminOffersPage() {
                   Description *
                 </label>
                 <textarea
+                  id="admin-offer-desc"
                   className="input-field"
                   required
                   rows={3}
@@ -1003,6 +1046,37 @@ export default function AdminOffersPage() {
                   placeholder="e.g. Mention Founders Edge when booking via website/email"
                   style={{ width: '100%', margin: 0 }}
                 />
+              </div>
+
+              <div style={{ background: 'rgba(231,182,5,0.06)', border: '1px solid rgba(231,182,5,0.2)', padding: '16px', borderRadius: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: newOffer.isPassport ? 12 : 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={newOffer.isPassport}
+                    onChange={e => setNewOffer(prev => ({ ...prev, isPassport: e.target.checked }))}
+                    style={{ accentColor: '#e7b605', width: 16, height: 16 }}
+                  />
+                  <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', color: '#2a2820' }}>
+                    Include in Founders Edge Passport Directory
+                  </span>
+                </label>
+
+                {newOffer.isPassport && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, color: '#9a9585' }}>
+                      Passport Category
+                    </label>
+                    <select
+                      className="select-field"
+                      value={newOffer.passportType}
+                      onChange={e => setNewOffer(prev => ({ ...prev, passportType: e.target.value as any }))}
+                      style={{ width: '100%', margin: 0, background: '#fff' }}
+                    >
+                      <option value="ticket">🎟️ Ticket / Event Pass</option>
+                      <option value="membership">🏢 Membership / Partner Club</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 12 }}>

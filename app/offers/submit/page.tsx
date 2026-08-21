@@ -32,6 +32,8 @@ type FormData = {
   eventsPageUrl: string;
   howToRedeem: string;
   promoCode: string;
+  isPassport: boolean;
+  passportType: 'ticket' | 'membership';
   agreeGuidelines: boolean;
 };
 
@@ -52,6 +54,8 @@ const initialForm: FormData = {
   eventsPageUrl: '',
   howToRedeem: '',
   promoCode: '',
+  isPassport: false,
+  passportType: 'ticket',
   agreeGuidelines: false,
 };
 
@@ -123,7 +127,11 @@ function validateForm(form: FormData): FormErrors {
     errors.customDiscount = 'Please describe your offer headline.';
   if (!form.description.trim() || form.description.trim().length < 20)
     errors.description = 'Description must be at least 20 characters.';
-  if (!form.expiryDate) errors.expiryDate = 'Expiry date is required.';
+  if (!form.expiryDate) {
+    errors.expiryDate = 'Expiry date is required.';
+  } else if (new Date(form.expiryDate).getTime() < new Date().setHours(0, 0, 0, 0)) {
+    errors.expiryDate = 'Expiry date must be today or a future date.';
+  }
   if (!form.howToRedeem.trim() || form.howToRedeem.trim().length < 10)
     errors.howToRedeem = 'Please explain how to redeem this offer (min 10 characters).';
   if (!form.agreeGuidelines) errors.agreeGuidelines = 'You must agree to the offer guidelines.';
@@ -215,6 +223,8 @@ function OfferSubmitContent() {
             eventsPageUrl: found.events_page_url || '',
             howToRedeem: found.how_to_redeem || '',
             promoCode: found.promo_code || '',
+            isPassport: Boolean(found.is_passport),
+            passportType: found.passport_type === 'membership' ? 'membership' : 'ticket',
             agreeGuidelines: true,
           });
         }
@@ -386,7 +396,18 @@ function OfferSubmitContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateForm(form);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      const firstErrKey = Object.keys(errs)[0];
+      const el = document.getElementById(`field-${firstErrKey}`) ||
+                 document.getElementById(firstErrKey) ||
+                 document.querySelector(`[name="${firstErrKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLElement).focus?.();
+      }
+      return;
+    }
 
     const url = isEditing ? `/api/offers/${editId}` : '/api/offers';
     const method = isEditing ? 'PUT' : 'POST';
@@ -594,6 +615,7 @@ function OfferSubmitContent() {
                 </label>
 
                 <input
+                  id="field-businessName"
                   className="input-field"
                   value={form.businessName}
                   onChange={e => handleChange('businessName', e.target.value)}
@@ -859,6 +881,7 @@ function OfferSubmitContent() {
                       <span style={{ padding: '0 14px', background: '#f0efe9', border: '1px solid #e2e0d8', borderRight: 'none', height: 48, display: 'flex', alignItems: 'center', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, color: '#5a5650' }}>$</span>
                     )}
                     <input
+                      id="field-discountValue"
                       className="input-field"
                       type="number"
                       min="1"
@@ -882,6 +905,7 @@ function OfferSubmitContent() {
                     Offer Headline *
                   </label>
                   <input
+                    id="field-customDiscount"
                     className="input-field"
                     value={form.customDiscount}
                     onChange={e => handleChange('customDiscount', e.target.value)}
@@ -910,6 +934,7 @@ function OfferSubmitContent() {
                   Offer Title *
                 </label>
                 <input
+                  id="field-title"
                   className="input-field"
                   value={form.title}
                   onChange={e => handleChange('title', e.target.value)}
@@ -924,6 +949,7 @@ function OfferSubmitContent() {
                   Description *
                 </label>
                 <textarea
+                  id="field-description"
                   className="input-field"
                   value={form.description}
                   onChange={e => handleChange('description', e.target.value)}
@@ -958,8 +984,10 @@ function OfferSubmitContent() {
                     Expiry Date *
                   </label>
                   <input
+                    id="field-expiryDate"
                     className="input-field"
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={form.expiryDate}
                     onChange={e => handleChange('expiryDate', e.target.value)}
                     style={{ margin: 0 }}
@@ -1030,6 +1058,7 @@ function OfferSubmitContent() {
                   How to Redeem *
                 </label>
                 <textarea
+                  id="field-howToRedeem"
                   className="input-field"
                   value={form.howToRedeem}
                   onChange={e => handleChange('howToRedeem', e.target.value)}
@@ -1042,9 +1071,50 @@ function OfferSubmitContent() {
               </div>
             </div>
 
-            {/* ── Section 4: Guidelines ── */}
+            {/* ── Section 4: Founders Edge Passport (Optional) ── */}
             <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '36px', marginBottom: 2 }}>
-              <div className="section-label" style={{ marginBottom: 20 }}>4. Guidelines</div>
+              <div className="section-label" style={{ marginBottom: 12 }}>4. Founders Edge Passport (Optional)</div>
+              <p style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.6, marginBottom: 20 }}>
+                Feature this offer in the curated <strong>Founders Edge Passport Directory</strong> for member event tickets, summits, or partner space memberships.
+              </p>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', marginBottom: form.isPassport ? 20 : 0 }}>
+                <input
+                  id="field-isPassport"
+                  type="checkbox"
+                  checked={form.isPassport}
+                  onChange={e => handleChange('isPassport', e.target.checked)}
+                  style={{ marginTop: 3, accentColor: '#e7b605', width: 16, height: 16, flexShrink: 0 }}
+                  disabled={atLimit}
+                />
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 700, color: '#2a2820', lineHeight: 1.5 }}>
+                  Submit this offer as a Founders Edge Passport listing
+                </span>
+              </label>
+
+              {form.isPassport && (
+                <div style={{ background: 'rgba(231,182,5,0.06)', border: '1px solid rgba(231,182,5,0.2)', padding: '20px', display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '12px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>
+                      Passport Category *
+                    </label>
+                    <select
+                      className="select-field"
+                      value={form.passportType}
+                      onChange={e => handleChange('passportType', e.target.value as any)}
+                      style={{ margin: 0, background: '#fff' }}
+                    >
+                      <option value="ticket">🎟️ Ticket / Event Pass (Conferences, Networking, Summits)</option>
+                      <option value="membership">🏢 Membership / Partner Club (Coworking, Clubs, Studios)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Section 5: Guidelines ── */}
+            <div style={{ background: '#fff', border: '1px solid #e2e0d8', padding: '36px', marginBottom: 2 }}>
+              <div className="section-label" style={{ marginBottom: 20 }}>5. Guidelines</div>
               <div style={{ background: '#f9f9f7', border: '1px solid #e2e0d8', padding: '20px 24px', marginBottom: 24 }}>
                 <ul style={{ fontFamily: 'Noto Serif, serif', color: '#5a5650', fontSize: '14px', lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
                   <li>Offers must be genuine and honoured when members inquire</li>
@@ -1057,6 +1127,7 @@ function OfferSubmitContent() {
 
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
                 <input
+                  id="field-agreeGuidelines"
                   type="checkbox"
                   checked={form.agreeGuidelines}
                   onChange={e => handleChange('agreeGuidelines', e.target.checked)}

@@ -66,6 +66,16 @@ export default function ApplyPage() {
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.';
     }
     setErrors(e);
+    if (Object.keys(e).length > 0) {
+      const firstErrKey = Object.keys(e)[0];
+      const el = document.getElementById(`field-${firstErrKey}`) ||
+                 document.getElementById(firstErrKey) ||
+                 document.querySelector(`[name="${firstErrKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLElement).focus?.();
+      }
+    }
     return Object.keys(e).length === 0;
   }
 
@@ -212,19 +222,19 @@ export default function ApplyPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Business Name *</label>
-                    <input className="input-field" value={form.businessName} onChange={e => update('businessName', e.target.value)} placeholder="e.g. NorthTech Solutions Inc." style={errors.businessName ? { borderColor: '#c0392b' } : undefined} />
+                    <input id="field-businessName" className="input-field" value={form.businessName} onChange={e => update('businessName', e.target.value)} placeholder="e.g. NorthTech Solutions Inc." style={errors.businessName ? { borderColor: '#c0392b' } : undefined} />
                     {errors.businessName && <p style={errStyle}>{errors.businessName}</p>}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>What does your business do? *</label>
-                    <textarea className="input-field" value={form.businessDesc} onChange={e => update('businessDesc', e.target.value)} placeholder="Describe your product/service, target customers, and what makes you unique..." style={{ height: 100, resize: 'vertical', ...(errors.businessDesc ? { borderColor: '#c0392b' } : {}) }} />
+                    <textarea id="field-businessDesc" className="input-field" value={form.businessDesc} onChange={e => update('businessDesc', e.target.value)} placeholder="Describe your product/service, target customers, and what makes you unique..." style={{ height: 100, resize: 'vertical', ...(errors.businessDesc ? { borderColor: '#c0392b' } : {}) }} />
                     {errors.businessDesc && <p style={errStyle}>{errors.businessDesc}</p>}
                   </div>
                   <div className="grid-form">
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Industry *</label>
                       <div style={{ position: 'relative' }}>
-                        <select className="select-field" value={form.industry} onChange={e => update('industry', e.target.value)} style={errors.industry ? { borderColor: '#c0392b' } : undefined}>
+                        <select id="field-industry" className="select-field" value={form.industry} onChange={e => update('industry', e.target.value)} style={errors.industry ? { borderColor: '#c0392b' } : undefined}>
                           <option value="">Select industry...</option>
                           {industries.map(i => <option key={i}>{i}</option>)}
                         </select>
@@ -428,18 +438,18 @@ export default function ApplyPage() {
                   <div className="grid-form">
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>First Name *</label>
-                      <input className="input-field" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder="Jordan" style={errors.firstName ? { borderColor: '#c0392b' } : undefined} />
+                      <input id="field-firstName" className="input-field" value={form.firstName} onChange={e => update('firstName', e.target.value)} placeholder="Jordan" style={errors.firstName ? { borderColor: '#c0392b' } : undefined} />
                       {errors.firstName && <p style={errStyle}>{errors.firstName}</p>}
                     </div>
                     <div>
                       <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Last Name *</label>
-                      <input className="input-field" value={form.lastName} onChange={e => update('lastName', e.target.value)} placeholder="Smith" style={errors.lastName ? { borderColor: '#c0392b' } : undefined} />
+                      <input id="field-lastName" className="input-field" value={form.lastName} onChange={e => update('lastName', e.target.value)} placeholder="Smith" style={errors.lastName ? { borderColor: '#c0392b' } : undefined} />
                       {errors.lastName && <p style={errStyle}>{errors.lastName}</p>}
                     </div>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Email Address *</label>
-                    <input className="input-field" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="jordan@yourcompany.com" style={errors.email ? { borderColor: '#c0392b' } : undefined} />
+                    <input id="field-email" className="input-field" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="jordan@yourcompany.com" style={errors.email ? { borderColor: '#c0392b' } : undefined} />
                     {errors.email && <p style={errStyle}>{errors.email}</p>}
                   </div>
                   <div>

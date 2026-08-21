@@ -15,6 +15,8 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
+      const el = document.getElementById('forgot-email');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
       return;
     }
 

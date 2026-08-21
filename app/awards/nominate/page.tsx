@@ -80,6 +80,22 @@ function NominateContent() {
         router.push(dest);
         return;
       }
+
+      // Pre-fill user profile info if available
+      const u = res.user;
+      const mp = (u as any).memberProfile;
+      const bizName = mp?.businesses?.[0]?.business_name || u.name || '';
+      const bizWeb = mp?.businesses?.[0]?.website || '';
+      const fullName = (mp?.first_name || mp?.last_name) ? `${mp.first_name || ''} ${mp.last_name || ''}`.trim() : u.name || '';
+
+      setForm(prev => ({
+        ...prev,
+        contactName: prev.contactName || fullName,
+        contactEmail: prev.contactEmail || u.email || '',
+        businessName: prev.businessName || bizName,
+        website: prev.website || bizWeb,
+      }));
+
       setCheckingAuth(false);
     };
 
@@ -162,7 +178,18 @@ function NominateContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateForm(form);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      const firstErrKey = Object.keys(errs)[0];
+      const el = document.getElementById(`field-${firstErrKey}`) ||
+                 document.getElementById(firstErrKey) ||
+                 document.querySelector(`[name="${firstErrKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (el as HTMLElement).focus?.();
+      }
+      return;
+    }
 
     try {
       let response;
@@ -296,22 +323,22 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
               <div>
                 <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Business Name *</label>
-                <input className="input-field" value={form.businessName} onChange={e => handleChange('businessName', e.target.value)} placeholder="Your business or company name" style={{ margin: 0 }} />
+                <input id="field-businessName" className="input-field" value={form.businessName} onChange={e => handleChange('businessName', e.target.value)} placeholder="Your business or company name" style={{ margin: 0 }} />
                 {errors.businessName && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 5, fontFamily: 'DM Sans, sans-serif' }}>{errors.businessName}</div>}
               </div>
               <div>
                 <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Contact Name *</label>
-                <input className="input-field" value={form.contactName} onChange={e => handleChange('contactName', e.target.value)} placeholder="Your full name" style={{ margin: 0 }} />
+                <input id="field-contactName" className="input-field" value={form.contactName} onChange={e => handleChange('contactName', e.target.value)} placeholder="Your full name" style={{ margin: 0 }} />
                 {errors.contactName && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 5, fontFamily: 'DM Sans, sans-serif' }}>{errors.contactName}</div>}
               </div>
               <div>
                 <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Email *</label>
-                <input className="input-field" type="email" value={form.contactEmail} onChange={e => handleChange('contactEmail', e.target.value)} placeholder="you@yourbusiness.com" style={{ margin: 0 }} />
+                <input id="field-contactEmail" className="input-field" type="email" value={form.contactEmail} onChange={e => handleChange('contactEmail', e.target.value)} placeholder="you@yourbusiness.com" style={{ margin: 0 }} />
                 {errors.contactEmail && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 5, fontFamily: 'DM Sans, sans-serif' }}>{errors.contactEmail}</div>}
               </div>
               <div>
                 <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Website</label>
-                <input className="input-field" value={form.website} onChange={e => handleChange('website', e.target.value)} placeholder="https://yourbusiness.com" style={{ margin: 0 }} />
+                <input id="field-website" className="input-field" value={form.website} onChange={e => handleChange('website', e.target.value)} placeholder="https://yourbusiness.com" style={{ margin: 0 }} />
               </div>
             </div>
           </div>
@@ -322,7 +349,7 @@ return (
 
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Key Achievement *</label>
-              <input className="input-field" value={form.achievement} onChange={e => handleChange('achievement', e.target.value)} placeholder="e.g. Grew revenue 3x in 12 months, launched in 3 new markets..." />
+              <input id="field-achievement" className="input-field" value={form.achievement} onChange={e => handleChange('achievement', e.target.value)} placeholder="e.g. Grew revenue 3x in 12 months, launched in 3 new markets..." />
               <div style={{ fontSize: '12px', color: '#9a9585', marginTop: 4, fontFamily: 'DM Sans, sans-serif' }}>One standout achievement that makes your nomination compelling</div>
               {errors.achievement && <div style={{ color: '#c0392b', fontSize: '12px', marginTop: 5, fontFamily: 'DM Sans, sans-serif' }}>{errors.achievement}</div>}
             </div>
@@ -330,6 +357,7 @@ return (
             <div>
               <label style={{ display: 'block', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8, color: '#2a2820' }}>Nomination Statement *</label>
               <textarea
+                id="field-statement"
                 className="input-field"
                 value={form.statement}
                 onChange={e => handleChange('statement', e.target.value)}
@@ -357,7 +385,7 @@ return (
               </ul>
             </div>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.agreeGuidelines} onChange={e => handleChange('agreeGuidelines', e.target.checked)} style={{ marginTop: 3, accentColor: '#e7b605', width: 16, height: 16, flexShrink: 0 }} />
+              <input id="field-agreeGuidelines" type="checkbox" checked={form.agreeGuidelines} onChange={e => handleChange('agreeGuidelines', e.target.checked)} style={{ marginTop: 3, accentColor: '#e7b605', width: 16, height: 16, flexShrink: 0 }} />
               <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: '#2a2820', lineHeight: 1.5 }}>
                 I confirm all information is accurate and I agree to the nomination guidelines.
               </span>

@@ -23,8 +23,8 @@ export class CreateNominationDto {
     contact_email!: string;
 
     @IsString()
-    @IsNotEmpty({ message: 'Website is required' })
-    website!: string;
+    @IsOptional()
+    website?: string;
 
     @IsString()
     @IsNotEmpty({ message: 'Achievement is required' })
@@ -144,10 +144,10 @@ export async function POST(request: Request) {
             data: {
                 award_id: data.award_id,
                 member_id: member.id,
-                business_name: data.business_name,
-                contact_name: data.contact_name,
-                contact_email: data.contact_email,
-                website: data.website,
+                business_name: data.business_name || (member as any).businesses?.[0]?.business_name || 'Founders Edge Member',
+                contact_name: data.contact_name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || user.name || user.email,
+                contact_email: data.contact_email || member.email || user.email,
+                website: data.website || (member as any).businesses?.[0]?.website || '',
                 achievement: data.achievement,
                 statement: data.statement,
                 status: 'PENDING',

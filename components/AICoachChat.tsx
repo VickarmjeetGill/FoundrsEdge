@@ -551,63 +551,127 @@ export default function AICoachChat({
         if (!content) return "";
         
         const lines = content.split("\n");
-        
-        return (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {lines.map((line, lineIndex) => {
-                    // Horizontal rule
-                    if (line.trim() === "---") {
-                        return <hr key={lineIndex} style={{ borderColor: "rgba(0,0,0,0.1)", margin: "14px 0" }} />;
-                    }
-                    
-                    // Headers (### Header)
-                    const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
-                    if (headerMatch) {
-                        const level = headerMatch[1].length;
-                        const text = headerMatch[2];
-                        return (
-                            <div 
-                                key={lineIndex} 
-                                style={{ 
-                                    fontSize: level <= 2 ? "17px" : "15px", 
-                                    fontWeight: "700",
-                                    marginTop: "18px",
-                                    marginBottom: "6px",
-                                    lineHeight: 1.4,
-                                    color: isUser ? "#09090b" : "#18181b"
-                                }}
-                            >
-                                {renderInlineFormatting(text, isUser)}
-                            </div>
-                        );
-                    }
-                    
-                    // Bullet lists (* list item)
-                    const bulletMatch = line.match(/^(\*|-)\s+(.*)$/);
-                    if (bulletMatch) {
-                        const text = bulletMatch[2];
-                        return (
-                            <div key={lineIndex} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginLeft: "6px", marginBottom: "6px" }}>
-                                <span style={{ color: isUser ? "#09090b" : "#e7b605", marginTop: "4px", flexShrink: 0 }}>•</span>
-                                <span style={{ flex: 1, fontSize: "15px", lineHeight: 1.65 }}>{renderInlineFormatting(text, isUser)}</span>
-                            </div>
-                        );
-                    }
-                    
-                    // Empty lines (spacing)
-                    if (line.trim() === "") {
-                        return <div key={lineIndex} style={{ height: "8px" }} />;
-                    }
-                    
-                    // Standard paragraphs
-                    return (
-                        <p key={lineIndex} style={{ fontSize: "15px", lineHeight: 1.65, margin: 0 }}>
-                            {renderInlineFormatting(line, isUser)}
-                        </p>
+        const elements: React.ReactNode[] = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            // Check if line starts a markdown table (starts and ends with |)
+            if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|")) {
+                const tableLines: string[] = [];
+                while (i < lines.length && lines[i].trim().startsWith("|") && lines[i].trim().endsWith("|")) {
+                    tableLines.push(lines[i].trim());
+                    i++;
+                }
+
+                // Filter out divider lines like |---|---| or |:---|:---|
+                const rows = tableLines
+                    .filter(t => !t.match(/^\|[\s:-|-]+\|$/))
+                    .map(rowStr => 
+                        rowStr
+                            .split("|")
+                            .slice(1, -1)
+                            .map(cell => cell.trim())
                     );
-                })}
-            </div>
-        );
+
+                if (rows.length > 0) {
+                    const headerRow = rows[0];
+                    const dataRows = rows.slice(1);
+
+                    elements.push(
+                        <div key={`table-${i}`} style={{ overflowX: "auto", margin: "14px 0", borderRadius: "8px", border: "1px solid #e4e4e7", background: "#ffffff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", fontFamily: "var(--font-sans, sans-serif)" }}>
+                                <thead>
+                                    <tr style={{ background: isUser ? "rgba(0,0,0,0.05)" : "#f4f4f5", borderBottom: "2px solid #e4e4e7" }}>
+                                        {headerRow.map((colText, colIdx) => (
+                                            <th key={colIdx} style={{ padding: "10px 14px", textAlign: "left", fontWeight: "700", color: "#18181b", fontSize: "13px" }}>
+                                                {renderInlineFormatting(colText, isUser)}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {dataRows.map((rowCells, rIdx) => (
+                                        <tr key={rIdx} style={{ borderBottom: rIdx === dataRows.length - 1 ? "none" : "1px solid #f4f4f5", background: rIdx % 2 === 1 ? "#fafafa" : "#ffffff" }}>
+                                            {rowCells.map((cellText, cIdx) => (
+                                                <td key={cIdx} style={{ padding: "10px 14px", color: "#27272a", lineHeight: 1.5, verticalAlign: "top" }}>
+                                                    {renderInlineFormatting(cellText, isUser)}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                }
+                continue;
+            }
+
+            // Horizontal rule
+            if (trimmed === "---") {
+                elements.push(<hr key={i} style={{ borderColor: "rgba(0,0,0,0.1)", margin: "14px 0" }} />);
+                i++;
+                continue;
+            }
+
+            // Headers (### Header)
+            const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+            if (headerMatch) {
+                const level = headerMatch[1].length;
+                const text = headerMatch[2];
+                elements.push(
+                    <div 
+                        key={i} 
+                        style={{ 
+                            fontSize: level <= 2 ? "17px" : "15px", 
+                            fontWeight: "700",
+                            marginTop: "18px",
+                            marginBottom: "6px",
+                            lineHeight: 1.4,
+                            color: isUser ? "#09090b" : "#18181b"
+                        }}
+                    >
+                        {renderInlineFormatting(text, isUser)}
+                    </div>
+                );
+                i++;
+                continue;
+            }
+
+            // Bullet lists (* list item)
+            const bulletMatch = line.match(/^(\*|-)\s+(.*)$/);
+            if (bulletMatch) {
+                const text = bulletMatch[2];
+                elements.push(
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginLeft: "6px", marginBottom: "6px" }}>
+                        <span style={{ color: isUser ? "#09090b" : "#e7b605", marginTop: "4px", flexShrink: 0 }}>•</span>
+                        <span style={{ flex: 1, fontSize: "15px", lineHeight: 1.65 }}>{renderInlineFormatting(text, isUser)}</span>
+                    </div>
+                );
+                i++;
+                continue;
+            }
+
+            // Empty lines (spacing)
+            if (trimmed === "") {
+                elements.push(<div key={i} style={{ height: "8px" }} />);
+                i++;
+                continue;
+            }
+
+            // Standard paragraphs
+            elements.push(
+                <p key={i} style={{ fontSize: "15px", lineHeight: 1.65, margin: 0 }}>
+                    {renderInlineFormatting(line, isUser)}
+                </p>
+            );
+            i++;
+        }
+
+        return <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>{elements}</div>;
     };
 
     const renderChatWorkspace = () => {

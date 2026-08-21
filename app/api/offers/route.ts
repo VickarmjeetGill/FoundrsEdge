@@ -115,6 +115,14 @@ export class CreateOfferDto {
     agreeGuidelines?: boolean;
 
     @IsOptional()
+    @IsBoolean()
+    isPassport?: boolean;
+
+    @IsOptional()
+    @IsString()
+    passportType?: string;
+
+    @IsOptional()
     @IsString()
     onBehalfOfMemberId?: string;
 }
@@ -455,6 +463,8 @@ export async function POST(request: Request) {
                 how_to_redeem: data.howToRedeem,
                 promo_code: data.promoCode || null,
                 is_affiliate: false,
+                is_passport: Boolean(data.isPassport),
+                passport_type: data.passportType || (data.isPassport ? 'ticket' : null),
                 status: isAdmin ? 'approved' : 'pending',
             },
         });

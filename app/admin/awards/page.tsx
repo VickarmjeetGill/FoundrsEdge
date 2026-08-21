@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Milestone, Activity } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Star, Trophy, LayoutDashboard, ClipboardList, LogOut, ChevronDown, ChevronUp, Calendar, Tag, Mail, Globe, Flag, Users, Milestone, Activity, Trash2 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { getProfile } from '@/app/actions/profile';
 import { logout } from '@/app/actions/auth';
@@ -27,6 +27,8 @@ export default function AdminAwardsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteModalNom, setDeleteModalNom] = useState<{ id: string; name: string; isWinner: boolean } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -133,6 +135,31 @@ export default function AdminAwardsPage() {
     } catch (err) {
       console.error('Error updating nomination status:', err);
       showToast('Error connecting to the server');
+    }
+  }
+
+  async function handleConfirmDeleteNomination() {
+    if (!deleteModalNom) return;
+    const targetId = deleteModalNom.id;
+    const prevNoms = nominations;
+    setIsDeleting(true);
+    setNominations(prev => prev.filter(n => n.id !== targetId));
+    showToast(deleteModalNom.isWinner ? 'Winner & nomination removed ✓' : 'Nomination deleted ✓');
+    setDeleteModalNom(null);
+
+    try {
+      const res = await fetch(`/api/nominations/${targetId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setNominations(prevNoms);
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to delete nomination');
+      }
+    } catch (err) {
+      setNominations(prevNoms);
+      console.error(err);
+      alert('Network error occurred.');
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -291,6 +318,12 @@ export default function AdminAwardsPage() {
                           <Globe size={13} /> Visit Website
                         </a>
                       )}
+                      <button
+                        onClick={() => setDeleteModalNom({ id: nom.id, name: `${nom.businessName} — ${nom.awardName}`, isWinner: nom.status === 'winner' })}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#c0392b', color: '#fff', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', marginLeft: 'auto' }}
+                      >
+                        <Trash2 size={13} /> {nom.status === 'winner' ? 'Delete Winner & Post' : 'Delete Nomination'}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -343,6 +376,44 @@ export default function AdminAwardsPage() {
           </button>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalNom && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e0d8', width: '100%', maxWidth: 480, padding: 32, position: 'relative', boxShadow: '0 12px 36px rgba(0,0,0,0.2)' }}>
+            <div style={{ width: 44, height: 44, background: 'rgba(192,57,43,0.1)', color: '#c0392b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', marginBottom: 16 }}>
+              <Trash2 size={22} />
+            </div>
+
+            <h3 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 900, fontSize: '20px', margin: '0 0 8px 0', color: '#2a2820' }}>
+              {deleteModalNom.isWinner ? 'Delete Winner & Nomination' : 'Delete Nomination'}
+            </h3>
+            <p style={{ fontSize: '14px', color: '#5a5650', lineHeight: 1.6, margin: '0 0 24px 0', fontFamily: 'Noto Serif, serif' }}>
+              Are you sure you want to permanently delete <strong style={{ color: '#2a2820' }}>"{deleteModalNom.name}"</strong>? {deleteModalNom.isWinner ? 'This will remove the winner highlight and completely remove the nomination from the database.' : 'This will permanently remove the submission.'}
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setDeleteModalNom(null)}
+                disabled={isDeleting}
+                style={{ padding: '11px 22px', background: '#f4f3ed', border: '1px solid #e2e0d8', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer', color: '#2a2820' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteNomination}
+                disabled={isDeleting}
+                style={{ padding: '11px 22px', background: '#c0392b', color: '#fff', border: 'none', fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '13px', cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.7 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                {isDeleting ? 'Deleting...' : (deleteModalNom.isWinner ? 'Delete Winner Post' : 'Delete Nomination')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div style={{ position: 'fixed', bottom: 32, right: 32, background: '#000', color: '#fff', padding: '14px 24px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '14px', zIndex: 9999, boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>

@@ -38,9 +38,21 @@ export async function getProfile() {
             return { error: 'Unauthorized' };
         }
 
+        const memberProfile = await prisma.members.findUnique({
+            where: { email: user.email },
+            include: { businesses: true }
+        });
+
         const isImpersonating = !!decodedSession.impersonatorId;
 
-        return { success: true, user, isImpersonating };
+        return { 
+            success: true, 
+            user: {
+                ...user,
+                memberProfile
+            }, 
+            isImpersonating 
+        };
     } catch (error: any) {
         console.error('Error fetching profile:', error);
         return { error: error.message || 'Server error' };

@@ -371,18 +371,19 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
       title: 'Delete Event',
       message: 'Are you sure you want to permanently delete this event from the database?',
       onConfirm: async () => {
+        const prevItems = items;
+        setItems(prev => prev.filter(i => i.id !== id));
+        onSuccess('Event deleted from database.');
+
         try {
-          const res = await fetch(`/api/events/${id}`, {
-            method: 'DELETE'
-          });
-          if (res.ok) {
-            setItems(items.filter(i => i.id !== id));
-            onSuccess('Event deleted from database.');
-          } else {
+          const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            setItems(prevItems);
             const data = await res.json();
             alert(`Error deleting event: ${data.error || 'Unknown error'}`);
           }
         } catch (err) {
+          setItems(prevItems);
           console.error(err);
           alert('Network error occurred while trying to delete event.');
         }
@@ -413,7 +414,7 @@ function EventsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string
             onChange={e => set('category', e.target.value)}
           >
             <option value="">Select Category</option>
-            {['Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'].map(c => <option key={c}>{c}</option>)}
+            {['Networking', 'Workshop', 'Panel & Speaker', 'Social', 'Other'].map(c => <option key={c}>{c}</option>)}
           </select>
           <FormError msg={errors.category} />
         </Field>
@@ -1230,23 +1231,97 @@ const blankWebinar = { title: '', speaker: '', speakerRole: '', date: '', time: 
 
 function WebinarsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string) => void; setConfirmModal: any }) {
   const [items, setItems] = useState<WebinarItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(blankWebinar);
   const [editId, setEditId] = useState<string | number | null>(null);
-  const [nextId, setNextId] = useState(1);
   const set = (key: string, value: string) => setForm(prevForm => ({ ...prevForm, [key]: value }));
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (editId !== null) {
-      setItems(items.map(i => i.id === editId ? { ...form, id: editId } : i));
-      onSuccess('Webinar updated.');
-      setEditId(null);
-    } else {
-      setItems([...items, { ...form, id: nextId }]);
-      setNextId(n => n + 1);
-      onSuccess('Webinar added.');
+  const fetchWebinars = async () => {
+    try {
+      const res = await fetch('/api/events?category=Webinar&adminView=true');
+      if (res.ok) {
+        const data = await res.json();
+        const evList = Array.isArray(data) ? data : data.events || [];
+        setItems(evList.map((e: any) => {
+          const speakerMatch = e.host ? e.host.match(/^(.*?)(?:\s*\((.*?)\))?$/) : null;
+          return {
+            id: e.id,
+            title: e.title,
+            speaker: speakerMatch ? speakerMatch[1] : (e.host || ''),
+            speakerRole: speakerMatch && speakerMatch[2] ? speakerMatch[2] : '',
+            date: e.date,
+            time: e.time,
+            duration: e.duration || '',
+            category: (e.tags && e.tags[1]) || 'Sales',
+            desc: e.description || '',
+          };
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load webinars:', err);
+    } finally {
+      setLoading(false);
     }
-    setForm(blankWebinar);
+  };
+
+  useEffect(() => {
+    fetchWebinars();
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const hostString = form.speakerRole ? `${form.speaker} (${form.speakerRole})` : form.speaker;
+    const payload = {
+      title: form.title,
+      description: form.desc || `Expert webinar on ${form.title}`,
+      date: form.date,
+      time: form.time,
+      location: 'Online (Zoom)',
+      category: 'Webinar',
+      price: 'Free (Members)',
+      host: hostString,
+      capacity: 500,
+      duration: form.duration || '60 min',
+      tags: ['Webinar', form.category, 'Online'],
+    };
+
+    try {
+      if (editId !== null) {
+        const prevItems = items;
+        setItems(items.map(i => i.id === editId ? { ...form, id: editId } : i));
+        onSuccess('Webinar updated.');
+        const res = await fetch(`/api/events/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          setItems(prevItems);
+          const d = await res.json().catch(() => ({}));
+          alert(d.error || 'Failed to update webinar');
+        } else {
+          fetchWebinars();
+        }
+        setEditId(null);
+      } else {
+        const res = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          onSuccess('Webinar added successfully.');
+          fetchWebinars();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          alert(d.error || 'Failed to create webinar');
+        }
+      }
+      setForm(blankWebinar);
+    } catch (err) {
+      console.error(err);
+      alert('Network error occurred.');
+    }
   }
 
   function handleEdit(item: WebinarItem) {
@@ -1260,9 +1335,20 @@ function WebinarsSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: stri
       isOpen: true,
       title: 'Delete Webinar',
       message: 'Are you sure you want to delete this webinar?',
-      onConfirm: () => {
+      onConfirm: async () => {
+        const prevItems = items;
         setItems(items.filter(i => i.id !== id));
         onSuccess('Webinar deleted.');
+        try {
+          const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            setItems(prevItems);
+            alert('Failed to delete webinar');
+          }
+        } catch (err) {
+          setItems(prevItems);
+          console.error(err);
+        }
       }
     });
   }
@@ -1290,23 +1376,92 @@ const blankSC = { title: '', date: '', time: '', location: '', capacity: '', des
 
 function SupperClubSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: string) => void; setConfirmModal: any }) {
   const [items, setItems] = useState<SupperClubItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(blankSC);
   const [editId, setEditId] = useState<string | number | null>(null);
-  const [nextId, setNextId] = useState(1);
   const set = (key: string, value: string | boolean) => setForm(prevForm => ({ ...prevForm, [key]: value }));
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (editId !== null) {
-      setItems(items.map(i => i.id === editId ? { ...form, id: editId } : i));
-      onSuccess('Supper Club event updated.');
-      setEditId(null);
-    } else {
-      setItems([...items, { ...form, id: nextId }]);
-      setNextId(n => n + 1);
-      onSuccess('Supper Club event added.');
+  const fetchSupperClub = async () => {
+    try {
+      const res = await fetch('/api/events?category=Supper Club&adminView=true');
+      if (res.ok) {
+        const data = await res.json();
+        const evList = Array.isArray(data) ? data : data.events || [];
+        setItems(evList.map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          time: e.time,
+          location: e.location,
+          capacity: e.capacity ? String(e.capacity) : '12',
+          desc: e.description || '',
+          inviteOnly: e.price ? e.price.toLowerCase().includes('invite') : true,
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to load supper club events:', err);
+    } finally {
+      setLoading(false);
     }
-    setForm(blankSC);
+  };
+
+  useEffect(() => {
+    fetchSupperClub();
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload = {
+      title: form.title,
+      description: form.desc || 'Intimate curated dinner for Calgary entrepreneurs.',
+      date: form.date,
+      time: form.time,
+      location: form.location,
+      category: 'Supper Club',
+      price: form.inviteOnly ? 'Invite Only' : 'Members Only',
+      host: 'Founders Edge',
+      capacity: parseInt(form.capacity as string) || 12,
+      duration: '3 Hours',
+      tags: ['Supper Club', 'Curated Dinner', form.inviteOnly ? 'Invite Only' : 'Members'],
+    };
+
+    try {
+      if (editId !== null) {
+        const prevItems = items;
+        setItems(items.map(i => i.id === editId ? { ...form, id: editId } : i));
+        onSuccess('Supper Club event updated.');
+        const res = await fetch(`/api/events/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          setItems(prevItems);
+          const d = await res.json().catch(() => ({}));
+          alert(d.error || 'Failed to update event');
+        } else {
+          fetchSupperClub();
+        }
+        setEditId(null);
+      } else {
+        const res = await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          onSuccess('Supper Club event added successfully.');
+          fetchSupperClub();
+        } else {
+          const d = await res.json().catch(() => ({}));
+          alert(d.error || 'Failed to create event');
+        }
+      }
+      setForm(blankSC);
+    } catch (err) {
+      console.error(err);
+      alert('Network error occurred.');
+    }
   }
 
   function handleEdit(item: SupperClubItem) {
@@ -1320,9 +1475,20 @@ function SupperClubSection({ onSuccess, setConfirmModal }: { onSuccess: (msg: st
       isOpen: true,
       title: 'Delete Supper Club Event',
       message: 'Are you sure you want to delete this supper club event?',
-      onConfirm: () => {
+      onConfirm: async () => {
+        const prevItems = items;
         setItems(items.filter(i => i.id !== id));
         onSuccess('Event deleted.');
+        try {
+          const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            setItems(prevItems);
+            alert('Failed to delete event');
+          }
+        } catch (err) {
+          setItems(prevItems);
+          console.error(err);
+        }
       }
     });
   }

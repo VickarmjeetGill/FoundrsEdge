@@ -31,10 +31,14 @@ export default function SetupPasswordPage() {
 
     if (!email.trim()) {
       setError('Please provide your email address.');
+      const el = document.getElementById('setup-email');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
       return;
     }
     if (!password) {
       setError('Please enter a new password.');
+      const el = document.getElementById('setup-password');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
       return;
     }
     const reqs = [
@@ -48,6 +52,8 @@ export default function SetupPasswordPage() {
 
     if (!isPasswordValid) {
       setError('Please satisfy all password security requirements below.');
+      const el = document.getElementById('setup-password');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); (el as HTMLElement).focus?.(); }
       return;
     }
     if (password !== confirmPassword) {
@@ -154,6 +160,7 @@ export default function SetupPasswordPage() {
                 Approved Email
               </label>
               <input
+                id="setup-email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -179,6 +186,7 @@ export default function SetupPasswordPage() {
               </label>
               <div style={{ position: 'relative' }}>
                 <input
+                  id="setup-password"
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}

@@ -70,7 +70,7 @@ export default function NetworkingPassportPage() {
         const res = await fetch('/api/passport/offers');
         if (res.ok) {
           const data: PassportOffer[] = await res.json();
-          setEvents(data.filter(o => o.type === 'ticket'));
+          setEvents(data.filter(o => o.type !== 'membership'));
           setMemberships(data.filter(o => o.type === 'membership'));
         }
       } catch (err) {
@@ -80,6 +80,12 @@ export default function NetworkingPassportPage() {
       }
     }
     loadPassportOffers();
+
+    if (typeof window !== 'undefined' && window.location.hash === '#passport-deals') {
+      setTimeout(() => {
+        document.getElementById('passport-deals')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    }
   }, []);
 
   const handleCopy = (id: string, code: string) => {
@@ -358,6 +364,47 @@ export default function NetworkingPassportPage() {
                     <PassportOfferCard key={offer.id} offer={offer} isMember={isMember} onCopy={handleCopy} copiedId={copiedId} />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* EMPTY STATE */}
+            {!loading && filteredEvents.length === 0 && filteredMemberships.length === 0 && (
+              <div style={{
+                textAlign: 'center',
+                padding: '60px 24px',
+                background: '#fff',
+                border: '1px solid #e2e0d8',
+                borderRadius: '8px',
+                maxWidth: 600,
+                margin: '0 auto'
+              }}>
+                <div style={{ width: 56, height: 56, background: 'rgba(231,182,5,0.1)', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                  <Ticket size={24} style={{ color: '#9b7011' }} />
+                </div>
+                <h3 style={{ fontFamily: 'var(--font-sans)', fontWeight: 800, fontSize: '20px', color: '#2a2820', marginBottom: 8 }}>
+                  No Active Passport Deals Right Now
+                </h3>
+                <p style={{ color: '#5a5650', fontSize: '14px', lineHeight: 1.6, marginBottom: 24, maxWidth: 440, margin: '0 auto 24px' }}>
+                  New event passes, summits, and partner club memberships are added regularly. Have an offer to list for members?
+                </p>
+                <Link
+                  href="/offers/submit"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#e7b605',
+                    color: '#000',
+                    padding: '12px 24px',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    textDecoration: 'none',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}
+                >
+                  Submit a Passport Offer <ArrowRight size={14} />
+                </Link>
               </div>
             )}
 

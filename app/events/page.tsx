@@ -29,19 +29,19 @@ type Event = {
 const categoryColors: Record<string, string> = {
   Networking: '#e7b605',
   Workshop: '#9b7011',
-  Webinar: '#5a3a08',
-  'Supper Club': '#000',
+  'Panel & Speaker': '#2563eb',
+  Social: '#059669',
   Other: '#5a5650',
 };
 
-const categories = ['All', 'Networking', 'Workshop', 'Webinar', 'Supper Club', 'Other'];
+const categories = ['All', 'Networking', 'Workshop', 'Panel & Speaker', 'Social', 'Other'];
 
 // Short explainers shown in the legend so new members understand each format.
 const eventTypeLegend: { label: string; desc: string }[] = [
   { label: 'Networking', desc: 'Casual mixers to meet other Calgary founders and grow your circle.' },
   { label: 'Workshop', desc: 'Hands-on sessions to build a specific skill, led by an expert.' },
-  { label: 'Webinar', desc: 'Online talks and live Q&As you can join from anywhere — no travel needed.' },
-  { label: 'Supper Club', desc: 'Intimate, curated dinners where a small group of founders connect over a meal.' },
+  { label: 'Panel & Speaker', desc: 'Inspiring discussions and keynotes from industry leaders.' },
+  { label: 'Social', desc: 'Relaxed gatherings and community meetups to connect with peers.' },
   { label: 'Other', desc: 'Community socials, one-offs, and everything that doesn\'t fit a box.' },
 ];
 
@@ -103,7 +103,11 @@ export default function EventsPage() {
         limit: itemsPerPage.toString(),
       });
 
-      if (category !== 'All') queryParams.append('category', category);
+      if (category !== 'All') {
+        queryParams.append('category', category);
+      } else {
+        queryParams.append('excludeCategories', 'Supper Club,Webinar');
+      }
       if (locationFilter !== 'All Locations') queryParams.append('locationType', locationFilter);
       if (featuredOnly) queryParams.append('featured', 'true');
       if (search) queryParams.append('q', search);
